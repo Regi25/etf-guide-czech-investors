@@ -1,4 +1,6 @@
-# ETF tahák: US ETFs vs. European alternatives
+# ETF Guide for Czech Investors
+
+US ETFs vs. European alternatives. On the site itself (Czech UI) the brand is **ETF tahák** ("ETF cheat sheet").
 
 A mobile-first, conversion-focused landing page for Czech retail investors arriving from a mobile ad. It explains why US-listed ETFs (SPY, IVV, VOO, all on **NYSE Arca**) are usually not available to EU retail investors. It compares four verified European UCITS alternatives, and offers a free PDF cheat sheet in exchange for an e-mail address.
 
@@ -8,6 +10,7 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
 
 | | |
 |---|---|
+| Project brief (summary) | [`docs/project-brief.md`](docs/project-brief.md) |
 | Research and verified data | [`docs/step-1-research.md`](docs/step-1-research.md) |
 | Implementation plan | [`docs/implementation-plan.md`](docs/implementation-plan.md) |
 | Ads | [`ads/ad-a.png`](ads/ad-a.png), [`ads/ad-b.png`](ads/ad-b.png) |
@@ -157,7 +160,7 @@ assets/tahak-etf.pdf  lead magnet
 ads/                  ad-a / ad-b as HTML + 1080x1350 PNG
 tests/e2e.mjs         dependency-free browser tests (Node 22+, Chrome)
 netlify.toml          Netlify config, CSP and security headers
-docs/                 research, plan
+docs/                 project brief, research, plan
 ai-log/               Claude Code session exports (/export)
 ```
 

@@ -17,7 +17,7 @@ Status labels:
 
 ## 0. Project state
 
-The repository (`main`) has no commits. It contains only `docs/initial-prompt.md` and this report.
+The repository (`main`) has no commits. It contains only `docs/initial-prompt.md` and this report. (Note added later: that file held the original brief. It was replaced by an independently written summary and renamed to `docs/project-brief.md`.)
 
 ## 1. Audience and primary need
 
