@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+._*
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
+*~
+__frame*.html
+
+# Editors
+.vscode/
+.idea/
+
+# Local tooling
+node_modules/
+*.log
+.env
+.env.*
