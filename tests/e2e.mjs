@@ -322,7 +322,7 @@ await test('analytics: full funnel fires events in order, tagged with the varian
   await p.eval(`document.querySelector('#lead-success [data-track="magnet_download"]').click(); true`);
 
   const names = await p.eval(`window.__events.map(e => e.name)`);
-  const expected = ['cta_click', 'comparison_view', 'form_start', 'form_submit', 'lead_success', 'magnet_download'];
+  const expected = ['page_view', 'cta_click', 'comparison_view', 'form_start', 'form_submit', 'lead_success', 'magnet_download'];
   assert(JSON.stringify(names) === JSON.stringify(expected), 'order: ' + names.join(','));
   const paths = await p.eval(`window.__events.map(e => e.path)`);
   assert(paths.every((x) => x.endsWith('/a') && !x.startsWith('/')), 'paths: ' + paths.join(','));
@@ -359,7 +359,7 @@ await test('analytics: no GoatCounter loaded is harmless; source clicks and than
   const p = await openPage('/');
   await p.eval(BLOCK_NAV);
   await p.eval(`document.querySelector('[data-track="source_click"]').click(); true`);
-  assert((await p.eval(`window.__events.map(e => e.name).join()`)) === 'source_click', 'source_click missing');
+  assert((await p.eval(`window.__events.map(e => e.name).join()`)) === 'page_view,source_click', 'source_click missing');
   await p.goto('/dekujeme.html');
   await p.eval(BLOCK_NAV);
   await p.eval(`document.querySelector('[data-track="magnet_download"]').click(); true`);
@@ -367,6 +367,81 @@ await test('analytics: no GoatCounter loaded is harmless; source clicks and than
   assert((await p.eval(`document.querySelector('.debug-panel') === null`)), 'debug panel must be off by default');
   assert(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
   await p.close();
+});
+
+/* ---------- Tests: page_view, compare button, comparison visibility, debug panel ---------- */
+
+const names = (p) => p.eval(`window.__events.map(e => e.name)`);
+const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
+
+await test('analytics: page_view is the first event on the landing page and carries the variant', async () => {
+  const p = await openPage(AD_B);
+  assert((await p.eval(`window.__events[0] && window.__events[0].path`)) === 'page_view/b', 'first event: ' + (await names(p)));
+  await p.goto('/dekujeme.html');
+  assert(!(await names(p)).includes('page_view'), 'thank-you page must not record a landing page_view');
+  await p.close();
+});
+
+for (const [width, height] of [[390, 844], [360, 640], [1280, 800]]) {
+  await test(`analytics ${width}x${height}: no comparison_view on load; "Zobrazit srovnání" fires compare_click + comparison_view`, async () => {
+    const p = await openPage('/', { width, height, mobile: width < 800 });
+    await settle();
+    assert(!(await names(p)).includes('comparison_view'), 'comparison_view fired without scrolling: ' + (await names(p)));
+    await p.eval(`document.querySelector('.hero [data-track="compare_click"]').click(); true`);
+    await p.waitFor(`window.__events.some(e => e.name === 'comparison_view')`, 4000);
+    const n = await names(p);
+    assert(n.indexOf('compare_click') > 0 && n.indexOf('compare_click') < n.indexOf('comparison_view'), 'order: ' + n);
+    await p.close();
+  });
+}
+
+await test('analytics: a 20px peek of the comparison does not count as comparison_view', async () => {
+  const p = await openPage('/');
+  await p.eval(`document.documentElement.style.scrollBehavior = 'auto';
+    window.scrollTo(0, document.querySelector('#srovnani .table-scroll').getBoundingClientRect().top + scrollY - innerHeight + 20); true`);
+  await settle();
+  assert(!(await names(p)).includes('comparison_view'), 'fired at 20px: ' + (await names(p)));
+  await p.close();
+});
+
+await test('analytics: comparison already peeking 20px at page load does not count (initial observer callback)', async () => {
+  // Measure where the table starts, then load with a viewport that ends 20px below that.
+  const probe = await openPage('/');
+  const tableTop = await probe.eval(`Math.round(document.querySelector('#srovnani .table-scroll').getBoundingClientRect().top + scrollY)`);
+  await probe.close();
+  const p = await openPage('/', { width: 390, height: tableTop + 20 });
+  await settle();
+  const visible = await p.eval(`Math.round(innerHeight - document.querySelector('#srovnani .table-scroll').getBoundingClientRect().top)`);
+  assert(visible > 0 && visible < 60, 'setup: table should peek slightly, visible px = ' + visible);
+  assert(!(await names(p)).includes('comparison_view'), 'fired on a small peek at load: ' + (await names(p)));
+  await p.close();
+});
+
+await test('debug: panel shows page_view on load and explains an unrecognised utm_content', async () => {
+  const p = await openPage('/?utm_content=a&debug=1');
+  assert((await p.eval(`[...document.querySelectorAll('.debug-panel li')].map(li => li.textContent).join()`)) === 'page_view/default', 'panel rows');
+  const info = await p.eval(`document.querySelector('.debug-panel p').textContent`);
+  assert(info.includes('variant: default') && info.includes('not recognised') && info.includes('ad_a_problem'), 'info: ' + info);
+  await p.goto('/?utm_content=ad_a_problem&debug=1'); // same session: first touch 'a' is kept
+  assert((await p.eval(`document.querySelector('.debug-panel p').textContent`)).includes('utm_content=a,'), 'first touch should still be shown');
+  await p.close();
+});
+
+await test('debug: utm_content is shown as text, never parsed as HTML', async () => {
+  const p = await openPage('/?debug=1&utm_content=' + encodeURIComponent('<img src=x onerror="window.__xss=1">'));
+  await settle(200);
+  assert((await p.eval(`document.querySelectorAll('.debug-panel img').length`)) === 0, 'HTML was injected');
+  assert((await p.eval(`window.__xss`)) === undefined, 'script ran');
+  assert(p.errors.length === 0, 'errors: ' + p.errors.join(' | '));
+  await p.close();
+});
+
+await test('utm: short values a and b are not variants (only ad_a_problem / ad_b_compare)', async () => {
+  for (const v of ['a', 'b', 'A', 'ad_a']) {
+    const p = await openPage('/?utm_content=' + v);
+    assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'default', v + ' should be default');
+    await p.close();
+  }
 });
 
 /* ---------- Tests: production headers ---------- */

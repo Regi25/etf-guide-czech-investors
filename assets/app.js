@@ -78,9 +78,19 @@
     var panel = document.createElement('aside');
     panel.className = 'debug-panel';
     panel.setAttribute('aria-label', 'Ladění: odeslané události');
-    panel.innerHTML = '<strong>debug: events</strong><ol></ol>';
+    var heading = document.createElement('strong');
+    heading.textContent = 'debug: events';
+    // Show which variant applied and why (textContent: the URL value is untrusted).
+    var info = document.createElement('p');
+    var utmContent = attribution.params && attribution.params.utm_content;
+    info.textContent = 'variant: ' + variantKey + (utmContent
+      ? ' (utm_content=' + utmContent + (variant ? ')' : ', not recognised: use ad_a_problem or ad_b_compare)')
+      : ' (no utm_content)');
+    debugList = document.createElement('ol');
+    panel.appendChild(heading);
+    panel.appendChild(info);
+    panel.appendChild(debugList);
     document.body.appendChild(panel);
-    debugList = panel.querySelector('ol');
   }
 
   function goatcounterReady() {
@@ -109,22 +119,31 @@
     }
   }
 
+  // Landing page view: the first step of the funnel, recorded through the
+  // same track() as every other event so the whole funnel has one source.
+  // (GoatCounter's automatic pageview still runs, but has no variant.)
+  if (heroTitle) track('page_view');
+
   // Clicks on anything marked data-track="<event>".
   document.addEventListener('click', function (event) {
     var el = event.target.closest && event.target.closest('[data-track]');
     if (el) track(el.getAttribute('data-track'));
   });
 
-  // Comparison seen: the first group of fund cards is at least 30 % visible.
-  var comparison = document.querySelector('#srovnani .cards');
-  if (comparison && 'IntersectionObserver' in window) {
+  // Comparison seen: the US table or the first fund card is at least half
+  // visible. Both count, because after the "Zobrazit srovnání" jump a phone
+  // shows the table while the first card is still below the fold.
+  var comparisonTargets = document.querySelectorAll('#srovnani .table-scroll, #srovnani .card');
+  if (comparisonTargets.length && 'IntersectionObserver' in window) {
     var seen = new IntersectionObserver(function (entries) {
-      if (entries.some(function (e) { return e.isIntersecting; })) {
+      // Check the ratio explicitly instead of relying on isIntersecting.
+      if (entries.some(function (e) { return e.intersectionRatio >= 0.5; })) {
         track('comparison_view');
         seen.disconnect();
       }
-    }, { threshold: 0.3 });
-    seen.observe(comparison);
+    }, { threshold: 0.5 });
+    seen.observe(comparisonTargets[0]);
+    if (comparisonTargets[1]) seen.observe(comparisonTargets[1]);
   }
 
   /* ---------- Lead form ---------- */

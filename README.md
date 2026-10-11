@@ -57,7 +57,7 @@ Deliberate content rules:
 
 ## Conversion decisions
 
-- **Message match:** `utm_content` switches the hero headline to match the ad that was clicked (A: problem, B: comparison). Unknown or no value shows a neutral default.
+- **Message match:** `utm_content` switches the hero headline to match the ad that was clicked (A: problem, B: comparison). Only the exact values `ad_a_problem` and `ad_b_compare` are recognised (see [Ad variants and links](#ad-variants-and-links)). Any other value, or none, shows a neutral default.
 - **CTA above the fold** on a 390px phone, repeated in the sticky header ("Tahák zdarma").
 - **Short form:** e-mail (required) and first name (optional). **Marketing consent is a separate, optional, unchecked box**; the PDF is given either way.
 - **Immediate delivery:** after submit the form is replaced by a download button. There is no e-mail round-trip and no double opt-in wait.
@@ -68,13 +68,13 @@ Deliberate content rules:
 
 > Visitors who just hit a broker's refusal to sell a US ETF have a specific, urgent question. A page that answers it neutrally and with verifiable sources, and that offers a reusable checklist for the next step in their broker app, will convert better than a generic "invest in ETFs" page. Matching the headline to the ad's promise further reduces drop-off in the first seconds.
 
-Primary metric: **lead rate = `lead_success` ÷ landing pageviews**, per ad variant.
+Primary metric: **lead rate = `lead_success/<v>` ÷ `page_view/<v>`**, per ad variant `<v>`. Both come from the same `track()` source.
 
 ## A/B testing hypotheses (prioritised)
 
 | # | Hypothesis | Change | Primary metric | Why this priority |
 |---|---|---|---|---|
-| 1 | **Problem framing (A) converts better than comparison framing (B)** for paid-social traffic, because it names the exact frustration the visitor just experienced. | Ad + hero A vs B (already built; split traffic 50/50 by ad set) | `lead_success/a` vs `lead_success/b` ÷ pageviews per `utm_content` | Highest impact on both CTR and landing conversion. Zero extra build cost. |
+| 1 | **Problem framing (A) converts better than comparison framing (B)** for paid-social traffic, because it names the exact frustration the visitor just experienced. | Ad + hero A vs B (already built; split traffic 50/50 by ad set) | `lead_success/a` ÷ `page_view/a` vs `lead_success/b` ÷ `page_view/b` | Highest impact on both CTR and landing conversion. Zero extra build cost. |
 | 2 | **Showing the form earlier increases leads** for high-intent visitors without hurting trust: a compact form directly under the hero, with the full comparison below. | Move the lead block above `#proc` (one HTML move) | Lead rate; guardrail: `comparison_view` rate and the share of `form_start` that reach `lead_success` | Likely large effect on a long mobile page; cheap; risk to trust is measurable. |
 | 3 | **A visual preview of the PDF increases perceived value** and therefore form completion. | Thumbnail of page 1 of the cheat sheet next to the bullets | `form_start` → `lead_success` completion rate, and lead rate | Smaller expected effect and needs a design asset, so it comes last. |
 
@@ -84,11 +84,14 @@ Run one test at a time and decide on a pre-registered sample size; at demo-scale
 
 GoatCounter (cookieless; its docs say it "probably doesn't require a GDPR consent notice"). It records `utm_campaign` and `utm_source` natively. **The ad variant travels in the event name** because GoatCounter doesn't record `utm_content`.
 
+All funnel events, including the landing page view, are recorded by one function, `track()` in `assets/app.js`. The funnel therefore has a single source and always starts with `page_view`.
+
 | Event path | Fires when |
 |---|---|
-| (pageview) | automatically by `count.js` |
-| `cta_click/<v>` | hero or header CTA clicked |
-| `comparison_view/<v>` | first group of fund cards ≥30 % visible (once) |
+| `page_view/<v>` | landing page (`index.html`) loaded; always the first event. Not fired on the thank-you page. |
+| `cta_click/<v>` | hero or header CTA ("Stáhnout tahák zdarma (PDF)", "Tahák zdarma") clicked |
+| `compare_click/<v>` | hero button "Zobrazit srovnání" clicked |
+| `comparison_view/<v>` | the US table **or** the first fund card is at least 50 % visible (once). The table counts too because after the "Zobrazit srovnání" jump a phone shows the table while the first card is still below the fold. |
 | `form_start/<v>` | first focus in the form (once) |
 | `form_submit/<v>` | submit with valid input |
 | `lead_success/<v>` | lead accepted (Netlify 2xx; in demo mode: simulated) |
@@ -96,7 +99,15 @@ GoatCounter (cookieless; its docs say it "probably doesn't require a GDPR consen
 | `magnet_download/<v>` | PDF link clicked (success panel or thank-you page) |
 | `source_click/<v>` | a fund's source link clicked |
 
-`<v>` is `a`, `b` or `default`. Add `?debug=1` to any URL to see events in an on-page log.
+`<v>` is `a`, `b` or `default`. It is derived from `utm_content`, but it is **not** a URL value itself.
+
+GoatCounter's own automatic pageview (from `count.js`) still runs. It shows the total traffic per URL and the campaign, but not the variant. Use `page_view/<v>` for funnel maths.
+
+**Debug panel:** add `debug=1` to the URL, e.g. `/?utm_content=ad_a_problem&debug=1`. A box in the bottom-right corner then:
+- shows which variant applied and why, e.g. "variant: default (utm_content=a, not recognised: use ad_a_problem or ad_b_compare)";
+- lists every event as it fires, starting with `page_view`.
+
+Elements without a `data-track` attribute (FAQ items, body text) record nothing when clicked.
 
 ### UTM attribution
 
@@ -107,12 +118,26 @@ On landing, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term
 
 Every Netlify submission (and its CSV export) therefore carries its ad.
 
-Ad links:
+### Ad variants and links
+
+`utm_content` must be **exactly** one of these values (lower case, with underscores):
+
+| Ad | Image | `utm_content` | Headline shown | Event suffix |
+|---|---|---|---|---|
+| A: problem | `ads/ad-a.png` | `ad_a_problem` | „Broker vám nedovolil koupit SPY nebo VOO? Tady je, co si můžete koupit místo nich." | `/a` |
+| B: comparison | `ads/ad-b.png` | `ad_b_compare` | „S&P 500, nebo celý svět? 4 evropské ETF v jednom srovnání." | `/b` |
+| none or anything else (e.g. `a`, `b`, `A`, `ad_a`) | — | — | default headline from `index.html` | `/default` |
+
+Full ad URLs. The site is not deployed yet, so replace `YOUR-SITE.netlify.app` with the real Netlify domain:
 
 ```
-A: https://<site>/?utm_source=meta&utm_medium=paid_social&utm_campaign=etf_cz_2026q4&utm_content=ad_a_problem
-B: https://<site>/?utm_source=meta&utm_medium=paid_social&utm_campaign=etf_cz_2026q4&utm_content=ad_b_compare
+Ad A: https://YOUR-SITE.netlify.app/?utm_source=meta&utm_medium=paid_social&utm_campaign=etf_cz_2026q4&utm_content=ad_a_problem
+Ad B: https://YOUR-SITE.netlify.app/?utm_source=meta&utm_medium=paid_social&utm_campaign=etf_cz_2026q4&utm_content=ad_b_compare
 ```
+
+For local testing, use the same query strings on `http://localhost:8000/`.
+
+**Testing tip:** the first ad of a browser session is kept. After opening one test URL, a different `utm_content` in the same window will **not** change the headline. Use a new incognito window (or close all tabs of the site) for each test URL.
 
 ## Project structure
 
@@ -137,7 +162,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 19 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 28 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -149,8 +174,14 @@ To regenerate the PDF after editing `tahak.html`:
 
 `tests/e2e.mjs` starts a local server that mimics Netlify Forms and sends the production CSP. It then drives headless Chrome over the DevTools protocol. It covers:
 - **Form:** validation, demo mode (nothing sent), live mode against the mock endpoint (lead POSTed, server error handled), honeypot.
-- **UTM:** both variants, persistence across navigation, first-touch rule, length cap.
-- **Analytics:** full funnel order and variant tags, events queued until GoatCounter loads, no errors without GoatCounter.
+- **UTM:** both variants, persistence across navigation, first-touch rule, length cap. Short values like `a`/`b` fall back to the default headline.
+- **Analytics:**
+  - full funnel order starting with `page_view`, with variant tags;
+  - `page_view` only on the landing page;
+  - "Zobrazit srovnání" fires `compare_click` and then `comparison_view` at 390×844, 360×640 and 1280×800;
+  - no `comparison_view` on load or on a small peek;
+  - events queued until GoatCounter loads, and no errors without it.
+- **Debug panel:** shows `page_view` on load, explains an unrecognised `utm_content`, and renders the URL value as text, never as HTML.
 - **CSP:** no CSP or console errors on any page.
 
 ## Deployment (Netlify)
@@ -178,7 +209,7 @@ Do this only after the privacy details are confirmed.
 ## What was tested, and what was not
 
 Tested locally:
-- 19/19 e2e tests pass.
+- 28/28 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.

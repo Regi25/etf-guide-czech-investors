@@ -220,3 +220,4 @@ section[id], #lead-success { scroll-margin-top: 4.5rem; }
   padding: .5rem .75rem; border-radius: 8px; opacity: .92;
 }
 .debug-panel ol { margin: .25rem 0 0; padding-left: 1.25rem; }
+.debug-panel p { margin: .2rem 0 0; color: #f0d27a; }
