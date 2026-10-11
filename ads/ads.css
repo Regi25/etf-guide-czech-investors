@@ -1,43 +1,54 @@
-/* Ad mock-ups, rendered at 1080x1350 (4:5 feed format). */
+/* Ad creatives, rendered at 1080x1350 (4:5 feed format).
+   Same visual identity as the site (assets/styles.css, light theme):
+   warm paper, dark ink, one deep-green accent, serif headings over a
+   system sans-serif, monospace tickers. */
+:root {
+  --bg: #faf8f3;
+  --surface: #fffefb;
+  --text: #1b1f24;
+  --muted: #5b6470;
+  --border: #e3ded3;
+  --accent: #1f5c4a;
+  --accent-text: #ffffff;
+  --error: #b3261e;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Iowan Old Style", Charter, Georgia, "Noto Serif", "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { width: 1080px; height: 1350px; overflow: hidden; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+body { width: 1080px; height: 1350px; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font-sans); }
 
-.ad { width: 1080px; height: 1350px; padding: 84px 84px 64px; display: flex; flex-direction: column; }
-.brand { font-weight: 800; font-size: 34px; letter-spacing: -.01em; margin-bottom: 48px; }
-.hook { font-size: 78px; line-height: 1.08; letter-spacing: -.025em; font-weight: 800; margin: 0 0 32px; }
-.body { font-size: 36px; line-height: 1.35; margin: 0 0 40px; }
-.cta { align-self: flex-start; font-size: 38px; font-weight: 800; padding: 26px 44px; border-radius: 22px; }
-.legal { margin-top: auto; font-size: 24px; opacity: .8; }
+.ad { width: 1080px; height: 1350px; padding: 76px 84px 64px; display: flex; flex-direction: column; }
+.brand { font: 700 38px/1 var(--font-serif); letter-spacing: -.005em; padding-bottom: 28px; border-bottom: 2px solid var(--border); margin-bottom: 44px; }
+.eyebrow { font-size: 24px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 18px; }
+.hook { font: 700 74px/1.08 var(--font-serif); letter-spacing: -.012em; margin: 0 0 24px; text-wrap: balance; }
+.sub { font: 400 36px/1.3 var(--font-serif); color: var(--muted); margin: 0 0 36px; }
+.body { font-size: 32px; line-height: 1.4; color: var(--muted); margin: 0 0 30px; }
+.teaser { border-left: 6px solid var(--accent); padding: 4px 0 4px 28px; margin: 0 0 14px; font-size: 38px; line-height: 1.32; font-weight: 600; font-variant-numeric: tabular-nums; }
+.source { font-size: 22px; color: var(--muted); margin: 0 0 0 34px; }
+.cta { align-self: flex-start; margin-top: auto; background: var(--accent); color: var(--accent-text); font-size: 36px; font-weight: 700; padding: 26px 44px; border-radius: 14px; }
+.legal { font-size: 22px; color: var(--muted); margin: 26px 0 0; }
 
-/* A: problem / curiosity */
-.ad-a { background: #0f1b2b; color: #fff; }
-.ad-a .hook em { font-style: normal; color: #ffcf5a; }
-.ad-a .body { color: #c9d4e0; }
-.ad-a .cta { background: #ffcf5a; color: #0f1b2b; }
-.ad-a .stage { display: flex; gap: 56px; align-items: flex-end; margin-bottom: 36px; }
+/* A: problem, then the alternative */
+.stage { display: flex; gap: 48px; align-items: flex-end; margin: 12px 0 44px; }
 .phone {
-  flex: none; width: 360px; height: 420px; background: #f4f6f8; color: #16202a;
-  border-radius: 48px 48px 0 0; border: 14px solid #2b3a4d; border-bottom: 0;
-  padding: 36px 28px 0; font-size: 22px;
+  flex: none; width: 330px; height: 330px; background: var(--surface);
+  border: 10px solid var(--text); border-bottom: 0; border-radius: 44px 44px 0 0;
+  padding: 30px 26px 0; font-size: 22px;
 }
-.phone .row { display: flex; justify-content: space-between; padding: 14px 0; border-bottom: 2px solid #d9dee3; }
-.phone .ticker { font-weight: 800; font-size: 30px; }
-.phone .btn { margin-top: 26px; background: #c9cfd6; color: #6b7682; text-align: center; padding: 18px; border-radius: 14px; font-weight: 700; }
-.phone .err { margin-top: 18px; background: #fde8e6; color: #a5281b; border-radius: 12px; padding: 14px 16px; font-weight: 600; line-height: 1.3; }
-.ad-a .side { font-size: 34px; line-height: 1.35; color: #c9d4e0; padding-bottom: 24px; }
-.ad-a .side strong { color: #fff; }
+.phone .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid var(--border); }
+.phone .ticker { font: 700 28px var(--font-mono); letter-spacing: .04em; }
+.phone .err { margin-top: 20px; color: var(--error); background: #fbeceb; border-radius: 10px; padding: 14px 16px; font-weight: 600; line-height: 1.3; }
+.caption { font-size: 22px; color: var(--muted); padding-bottom: 12px; }
 
-/* B: clarity / comparison */
-.ad-b { background: #f4f6f8; color: #16202a; }
-.ad-b .brand { color: #0b5cad; }
-.ad-b .body { color: #3f4b57; }
-.ad-b .cta { background: #0b5cad; color: #fff; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px; }
-.tile { background: #fff; border: 2px solid #d9dee3; border-radius: 26px; padding: 28px 30px; }
-.tile .idx { font-size: 24px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #0b5cad; }
-.tile .idx.global { color: #1d7a55; }
-.tile .fee { font-size: 58px; font-weight: 800; letter-spacing: -.02em; margin: 6px 0 2px; }
-.tile .fee small { font-size: 24px; font-weight: 600; color: #55626f; }
-.tile .name { font-size: 24px; color: #3f4b57; }
-.ad-b .note { font-size: 22px; color: #55626f; margin: -20px 0 32px; }
+/* B: S&P 500 vs global equities */
+.group { margin: 0 0 26px; }
+.group-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 24px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); padding-bottom: 10px; border-bottom: 3px solid var(--text); }
+.group-label span { font-weight: 600; letter-spacing: .02em; text-transform: none; color: var(--muted); }
+.fund { display: grid; grid-template-columns: 170px 1fr auto; align-items: baseline; gap: 24px; padding: 16px 0; border-bottom: 2px solid var(--border); }
+.fund .tk { font: 700 34px var(--font-mono); letter-spacing: .04em; color: var(--accent); }
+.fund .nm { font-size: 24px; line-height: 1.3; color: var(--muted); }
+.fund .nm strong { color: var(--text); font-weight: 600; }
+.fund .fee { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { font-size: 22px; color: var(--muted); margin: 6px 0 0; }

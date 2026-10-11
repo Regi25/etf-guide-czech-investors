@@ -749,6 +749,61 @@ for (const [width, height] of [[320, 640], [375, 667], [390, 844], [768, 1024], 
   });
 }
 
+/* ---------- Tests: ads and PDF (M5) ---------- */
+
+// Fees as the landing page shows them in the fund cards (single source for consistency checks).
+const cardFees = async () => { const p = await openPage('/'); const f = await p.eval(CARD_FEES); await p.close(); return f; };
+
+for (const ad of ['a', 'b']) {
+  await test(`ad ${ad.toUpperCase()}: renders inside 1080x1350, fees equal the fund cards, not-advice line present`, async () => {
+    const fees = await cardFees();
+    const p = await openPage(`/ads/ad-${ad}.html`, { width: 1080, height: 1350, mobile: false });
+    const r = await p.eval(`(() => { const els = [...document.querySelectorAll('.ad *')]; return {
+      bottom: Math.max(...els.map(e => e.getBoundingClientRect().bottom)), right: Math.max(...els.map(e => e.getBoundingClientRect().right)),
+      text: document.querySelector('.ad').textContent.replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim() }; })()`);
+    assert(r.bottom <= 1350 && r.right <= 1080, `clipped: bottom ${r.bottom}, right ${r.right}`);
+    assert(r.text.includes('Nejde o investiční doporučení'), 'not-advice line missing');
+    assert(!/celý svět/i.test(r.text), 'ad must not say "celý svět"');
+    for (const [ticker, fee] of Object.entries(fees)) if (r.text.includes(ticker)) assert(r.text.includes(fee), `${ticker} fee ${fee} missing in ad`);
+    if (ad === 'a') {
+      const lp = await openPage(AD_A); const teaser = norm(await lp.eval(`document.getElementById('hero-teaser').textContent`)); await lp.close();
+      assert(r.text.includes(teaser), 'ad A must repeat the variant A teaser: ' + teaser);
+      assert(r.text.includes('Ilustrační obrázek'), 'phone mock-up must be labelled as an illustration');
+    } else {
+      for (const m of ['S&P 500, nebo globální akcie?', 'jen USA', 'Globální akcie', 'SWDA', 'rozvinuté trhy', 'VWCE', 'rozvinuté i rozvíjející se trhy', 'CSPX', 'VUAA'])
+        assert(r.text.includes(m), `ad B lacks "${m}"`);
+      const fund = await p.eval(`[...document.querySelectorAll('.fund')].map(f => f.querySelector('.tk').textContent + ' ' + f.querySelector('.fee').textContent.replace(/\\u00a0/g, ' '))`);
+      for (const line of fund) { const [tk, ...rest] = line.split(' '); assert(rest.join(' ') === fees[tk], `${tk}: ad ${rest.join(' ')} vs card ${fees[tk]}`); }
+    }
+    await p.close();
+  });
+}
+
+await test('PDF source (tahak.html): fees per ticker equal the fund cards; no "celý svět"', async () => {
+  const fees = await cardFees();
+  const p = await openPage('/tahak.html', { width: 900, height: 1200, mobile: false });
+  const rows = await p.eval(`[...document.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('.tk')).map(tr => [tr.querySelector('.tk').textContent, tr.children[3].textContent.replace(/\\u00a0/g, ' ').trim()])`);
+  const text = await p.eval(`document.body.textContent`);
+  assert(!/celý svět/i.test(text), 'PDF source must not say "celý svět"');
+  for (const [tk, fee] of rows) if (fees[tk]) assert(fee.startsWith(fees[tk]), `${tk}: PDF ${fee} vs card ${fees[tk]}`);
+  assert(rows.length === 7, 'expected 7 fund rows, got ' + rows.length);
+  await p.close();
+});
+
+await test('PDF file: exactly 2 pages; every source URL from tahak.html is a clickable link', async () => {
+  const bytes = Buffer.from(await (await fetch(BASE + '/assets/tahak-etf.pdf')).arrayBuffer()).toString('latin1');
+  const count = bytes.match(/\/Type \/Pages[\s\S]{0,200}?\/Count (\d+)|\/Count (\d+)/);
+  const pages = Number(count[1] || count[2]);
+  assert(pages === 2, 'PDF pages: ' + pages);
+  // Chrome normalises a bare origin to "https://host/", so compare without a trailing slash.
+  const noSlash = (u) => u.replace(/\/$/, '');
+  const uris = new Set([...bytes.matchAll(/\/URI \((https:\/\/[^)]*)\)/g)].map((m) => noSlash(m[1])));
+  const html = await (await fetch(BASE + '/tahak.html')).text();
+  const expected = new Set([...html.matchAll(/<a href="(https:\/\/[^"]+)"/g)].map((m) => m[1]));
+  assert(expected.size === 13, 'expected 13 source links in tahak.html, got ' + expected.size);
+  for (const u of expected) assert(uris.has(noSlash(u)), 'not a link in the PDF: ' + u);
+});
+
 /* ---------- Tests: production headers ---------- */
 
 await test('csp: every page loads with the production CSP and no console errors', async () => {

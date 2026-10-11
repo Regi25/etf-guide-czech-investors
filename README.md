@@ -15,6 +15,7 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
 | Implementation plan | [`docs/implementation-plan.md`](docs/implementation-plan.md) |
 | Ads | [`ads/ad-a.png`](ads/ad-a.png), [`ads/ad-b.png`](ads/ad-b.png) |
 | Lead magnet | [`assets/tahak-etf.pdf`](assets/tahak-etf.pdf) (source: `tahak.html`) |
+| Screenshots | [`docs/screenshots/`](docs/screenshots/) (ad A, ad B, PDF page 1, variant B at 375×667) |
 | AI session logs | [`ai-log/`](ai-log/) |
 
 ## Concept
@@ -60,6 +61,33 @@ Deliberate content rules:
 - **System fonts, no third-party assets.** This keeps the page fast and avoids sending visitor data to font CDNs.
 - **Light and dark themes** follow the system setting. All text/background pairs pass WCAG AA contrast (≥4.5:1, computed).
 - **Strict CSP** (`netlify.toml`): only the site itself and GoatCounter are allowed. There are no inline scripts or styles.
+
+## Visual identity
+
+The site, both ads and the PDF share one editorial look:
+
+| | Light | Dark (site only) |
+|---|---|---|
+| Paper / background | `#FAF8F3` (cards `#FFFEFB`) | `#14171A` (cards `#1E2328`) |
+| Ink / text | `#1B1F24` | `#E8E4DA` |
+| Muted text | `#5B6470` | `#A7AFB8` |
+| Rules | `#E3DED3`; input borders `#857E72` (≥ 3:1) | `#2C3238`; input borders `#727B84` |
+| Accent (links, buttons, tickers) | deep green `#1F5C4A` | `#7CC4A8` |
+
+- **Typography.**
+  - Headings: serif `"Iowan Old Style", Charter, Georgia, "Noto Serif", serif`.
+  - Body: the system sans-serif.
+  - Tickers and ISINs: monospace.
+  - Fees and dates: tabular figures.
+  - No text below 13px on the site.
+  - Czech diacritics were checked in Chrome on macOS (Iowan Old Style, Charter, Georgia and the system sans all render them without fallback). Android's Noto Serif was not available to check.
+- **Where the tokens live.**
+  - `assets/styles.css`: site, light and dark.
+  - `ads/ads.css`: ads, light.
+  - `assets/tahak.css`: PDF, light.
+
+  The values are repeated in each file because the ads and the PDF are rendered as standalone pages. Change all three together; the tests check that fees match across the page, the ads and the PDF.
+- **PDF.** The page background stays white so it prints cleanly. Table rows and the notes box never split across pages, and the 13 source URLs are clickable links.
 
 ## Conversion decisions
 
@@ -135,6 +163,16 @@ Every Netlify submission (and its CSV export) therefore carries its ad.
 | B: comparison | `ads/ad-b.png` | `ad_b_compare` | „S&P 500, nebo globální akcie? 4 evropské ETF v jednom srovnání." | `/b` |
 | none or anything else (e.g. `a`, `b`, `A`, `ad_a`) | — | — | default headline from `index.html` | `/default` |
 
+The creatives (`ads/ad-*.html`, rendered to 1080×1350 PNG):
+- **Ad A** opens with the problem: an illustration labelled as an illustration, then „Broker vám nedovolil koupit SPY nebo VOO?". It then shows the exact variant A teaser, „Místo SPY / VOO: CSPX nebo VUAA — stejný index S&P 500, roční náklady 0,07 %", with CTA „Ukázat alternativy →".
+- **Ad B** asks „S&P 500, nebo globální akcie?" and lists the four funds in two groups:
+  - S&P 500, US only: CSPX 0,07 %, VUAA 0,07 %;
+  - global equities: SWDA, MSCI World, developed markets, 0,20 %; VWCE, FTSE All-World, developed and emerging markets, 0,14 %.
+
+  CTA „Porovnat ETF →".
+
+Both carry the not-advice line, and every fee is checked against the fund cards by the tests.
+
 Full ad URLs. The site is not deployed yet, so replace `YOUR-SITE.netlify.app` with the real Netlify domain:
 
 ```
@@ -162,7 +200,7 @@ assets/tahak-nahled.jpg  preview of PDF page 1 (rendered from the PDF)
 ads/                  ad-a / ad-b as HTML + 1080x1350 PNG
 tests/e2e.mjs         dependency-free browser tests (Node 22+, Chrome)
 netlify.toml          Netlify config, CSP and security headers
-docs/                 project brief, research, plan
+docs/                 project brief, research, plan, screenshots/
 ai-log/               Claude Code session exports (/export)
 ```
 
@@ -170,7 +208,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 59 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 66 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -203,7 +241,15 @@ To regenerate the PDF after editing `tahak.html`:
   - the first-name field is gone and not submitted;
   - the PDF preview loads, has alt text, sits beside the list and is under 60 KB;
   - anchor jumps land flush under the sticky header;
-  - form input borders have at least 3:1 contrast in light and dark.
+  - form input borders have at least 3:1 contrast in light and dark;
+  - „Podrobnosti" collapsed on 320/375/390 px, toggling with Enter and Space, with the expanded state exposed.
+- **Ads and PDF (M5):**
+  - both ads fit 1080×1350, carry the not-advice line and never say „celý svět";
+  - their fees equal the fund cards;
+  - ad A repeats the variant A teaser;
+  - ad B shows the S&P 500 / global split with each fund's coverage;
+  - the PDF source fees equal the cards;
+  - the PDF has exactly 2 pages, and all 13 source URLs are clickable links.
 - **CSP:** no CSP or console errors on any page.
 
 ## Deployment (Netlify)
@@ -231,7 +277,7 @@ Do this only after the privacy details are confirmed.
 ## What was tested, and what was not
 
 Tested locally:
-- 59/59 e2e tests pass.
+- 66/66 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.
@@ -256,4 +302,6 @@ Tested locally:
 
 ## AI usage
 
-Built with Claude Code. Genuine session exports created with `/export` are stored in [`ai-log/`](ai-log/). No logs were written or edited by hand.
+Built with Claude Code. Session exports created with `/export` are stored unedited in [`ai-log/`](ai-log/) (`*.txt`). [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md) is a separate written summary of decisions and corrections, drafted with Claude and reviewed by the owner. It is not an export.
+
+The current export covers the session up to the MVP (11:30). The later milestones (M1–M5) still need a fresh `/export`, which only the owner can run.
