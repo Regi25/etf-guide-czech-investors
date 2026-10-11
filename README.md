@@ -173,6 +173,38 @@ The creatives (`ads/ad-*.html`, rendered to 1080×1350 PNG):
 
 Both carry the not-advice line, and every fee is checked against the fund cards by the tests.
 
+#### Meta ad copy (Czech)
+
+The copy uses the same facts and wording as the image and the matching landing variant. It makes no profit or return promises, and every fee is a verified annual-cost figure with its date. Each primary text is written so that the key point fits in the first ~125 characters, which Meta usually shows before "…Zobrazit více" (See more).
+
+**Ad A: problem** (lands on `utm_content=ad_a_problem`)
+
+| Field | Copy | Length |
+|---|---|---|
+| Primary text | Broker vám nedovolil koupit SPY nebo VOO? Americkým ETF obvykle chybí evropský dokument KID. Místo nich: CSPX nebo VUAA – stejný index S&P 500, roční náklady 0,07 % (podle správců fondů, ověřeno 11. 10. 2026). Dostupnost si ověřte u svého brokera. Tahák v PDF zdarma. Nejde o investiční doporučení. | 298 |
+| Headline | Co koupit místo SPY a VOO | 25 |
+| Description | Srovnání ETF se zdroji | 22 |
+| CTA button | **Learn more** (Czech UI label: „Další informace") | — |
+
+**Ad B: comparison** (lands on `utm_content=ad_b_compare`)
+
+| Field | Copy | Length |
+|---|---|---|
+| Primary text | S&P 500, nebo globální akcie? 4 evropské ETF: CSPX a VUAA (S&P 500) 0,07 % ročně, globální SWDA 0,20 % a VWCE 0,14 %. SWDA pokrývá rozvinuté trhy, VWCE i rozvíjející se. Roční náklady podle správců fondů, ověřeno 11. 10. 2026. Tahák v PDF zdarma. Nejde o investiční doporučení. | 277 |
+| Headline | 4 evropské ETF v jednom přehledu | 32 |
+| Description | Poplatky, ISIN a zdroje | 23 |
+| CTA button | **Learn more** (Czech UI label: „Další informace") | — |
+
+Notes:
+- **Why "Learn more":** both ads lead to the comparison, and the PDF needs an e-mail address. "Download" would promise an instant file the click does not deliver.
+- **To check in Ads Manager before launch:**
+  - the exact Czech CTA label;
+  - Meta's current length guidance (commonly about 125 / 40 / 30 characters for primary text / headline / description);
+  - the rules for financial-services ads in the Czech Republic.
+
+  None of these were verified here.
+- **If any fee changes,** update the image, the landing page, the PDF and this copy together. The tests cover the first three, not this README text.
+
 Full ad URLs. The site is not deployed yet, so replace `YOUR-SITE.netlify.app` with the real Netlify domain:
 
 ```
