@@ -64,6 +64,69 @@
     heroTitle.setAttribute('data-variant', variant.key);
   }
 
+  /* ---------- Analytics (GoatCounter, cookieless) ---------- */
+
+  // Event path = "<event>/<variant>", e.g. "lead_success/a". GoatCounter
+  // records utm_campaign and utm_source itself, but not utm_content, so the
+  // ad variant travels in the event name.
+  var debug = query.get('debug') === '1';
+  var events = window.__events = [];
+  var pendingCounts = [];
+  var debugList = null;
+
+  if (debug) {
+    var panel = document.createElement('aside');
+    panel.className = 'debug-panel';
+    panel.setAttribute('aria-label', 'Ladění: odeslané události');
+    panel.innerHTML = '<strong>debug: events</strong><ol></ol>';
+    document.body.appendChild(panel);
+    debugList = panel.querySelector('ol');
+  }
+
+  function goatcounterReady() {
+    return window.goatcounter && typeof window.goatcounter.count === 'function';
+  }
+
+  function flushCounts() {
+    if (!goatcounterReady()) return;
+    while (pendingCounts.length) {
+      try { window.goatcounter.count(pendingCounts.shift()); } catch (e) { /* never break the page */ }
+    }
+  }
+
+  var gcScript = document.getElementById('goatcounter-script');
+  if (gcScript) gcScript.addEventListener('load', flushCounts);
+
+  function track(name) {
+    var path = name + '/' + variantKey;
+    events.push({ name: name, variant: variantKey, path: path, ms: Date.now() - pageLoadedAt });
+    pendingCounts.push({ path: path, title: name, event: true });
+    flushCounts();
+    if (debugList) {
+      var li = document.createElement('li');
+      li.textContent = path;
+      debugList.appendChild(li);
+    }
+  }
+
+  // Clicks on anything marked data-track="<event>".
+  document.addEventListener('click', function (event) {
+    var el = event.target.closest && event.target.closest('[data-track]');
+    if (el) track(el.getAttribute('data-track'));
+  });
+
+  // Comparison seen: the first group of fund cards is at least 30 % visible.
+  var comparison = document.querySelector('#srovnani .cards');
+  if (comparison && 'IntersectionObserver' in window) {
+    var seen = new IntersectionObserver(function (entries) {
+      if (entries.some(function (e) { return e.isIntersecting; })) {
+        track('comparison_view');
+        seen.disconnect();
+      }
+    }, { threshold: 0.3 });
+    seen.observe(comparison);
+  }
+
   /* ---------- Lead form ---------- */
 
   var form = document.getElementById('lead-form');
@@ -98,6 +161,11 @@
     emailError.hidden = !show;
     email.setAttribute('aria-invalid', show ? 'true' : 'false');
   }
+
+  form.addEventListener('focusin', function onStart() {
+    form.removeEventListener('focusin', onStart);
+    track('form_start');
+  });
 
   email.addEventListener('input', function () {
     if (!emailError.hidden && isValidEmail(email.value.trim())) setEmailError(false);
@@ -142,6 +210,7 @@
       return;
     }
     setEmailError(false);
+    track('form_submit');
 
     fillAttributionFields();
     form.elements.time_to_submit_ms.value = String(Date.now() - pageLoadedAt);
@@ -150,8 +219,12 @@
     submitBtn.setAttribute('aria-busy', 'true');
 
     send(new URLSearchParams(new FormData(form)))
-      .then(showSuccess)
+      .then(function () {
+        track('lead_success');
+        showSuccess();
+      })
       .catch(function () {
+        track('form_error');
         formError.hidden = false;
       })
       .then(function () {

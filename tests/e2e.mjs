@@ -84,6 +84,11 @@ async function openPage(path, { width = 390, height = 844, mobile = true } = {})
   const { targetId } = await cdp('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true });
   await cdp('Page.enable', {}, sessionId);
+  await cdp('Runtime.enable', {}, sessionId);
+  const errors = [];
+  listeners.push((m) => {
+    if (m.sessionId === sessionId && m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
+  });
   await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile }, sessionId);
   const goto = async (p) => {
     const loaded = new Promise((r) => {
@@ -96,6 +101,7 @@ async function openPage(path, { width = 390, height = 844, mobile = true } = {})
   await goto(path);
   const page = {
     goto, // same tab, so sessionStorage is kept
+    errors,
 
     eval: async (expr) => {
       const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, sessionId);
@@ -288,6 +294,73 @@ await test('live (mock Netlify): attribution reaches the submitted lead', async 
   await p.waitFor(isVisible('#lead-success'));
   const last = posts.at(-1);
   assert(last.email === 'karel@example.cz' && last.utm_content === 'ad_a_problem' && last.landing_variant === 'a', 'POST lacks attribution: ' + JSON.stringify(last));
+  await p.close();
+});
+
+/* ---------- Tests: analytics events ---------- */
+
+// Stand-in for GoatCounter's count.js: records every count() call.
+const FAKE_GC = `window.__gcCalls = []; window.goatcounter = { count: (v) => window.__gcCalls.push(v) }; true`;
+// Stop real navigation/download on link clicks after our handlers have run.
+const BLOCK_NAV = `window.addEventListener('click', (e) => { if (e.target.closest('a')) e.preventDefault(); }); true`;
+
+await test('analytics: full funnel fires events in order, tagged with the variant', async () => {
+  const p = await openPage(AD_A + '&debug=1');
+  await p.eval(BLOCK_NAV);
+  await p.eval(`document.querySelector('.hero [data-track="cta_click"]').click(); true`);
+  await p.eval(`document.querySelector('#srovnani .cards').scrollIntoView(); true`);
+  await p.waitFor(`window.__events.some(e => e.name === 'comparison_view')`);
+  await p.eval(FAKE_GC); // GoatCounter "loads" mid-session: earlier events must be flushed
+  await p.eval(`document.getElementById('email').focus(); true`);
+  await p.eval(fillAndSubmit('jana@example.cz'));
+  await p.waitFor(isVisible('#lead-success'));
+  await p.eval(`document.querySelector('#lead-success [data-track="magnet_download"]').click(); true`);
+
+  const names = await p.eval(`window.__events.map(e => e.name)`);
+  const expected = ['cta_click', 'comparison_view', 'form_start', 'form_submit', 'lead_success', 'magnet_download'];
+  assert(JSON.stringify(names) === JSON.stringify(expected), 'order: ' + names.join(','));
+  const paths = await p.eval(`window.__events.map(e => e.path)`);
+  assert(paths.every((x) => x.endsWith('/a') && !x.startsWith('/')), 'paths: ' + paths.join(','));
+  const calls = await p.eval('window.__gcCalls');
+  assert(calls.length === expected.length && calls.every((c) => c.event === true), 'GoatCounter calls: ' + JSON.stringify(calls));
+  assert((await p.eval(`document.querySelectorAll('.debug-panel li').length`)) === expected.length, 'debug panel incomplete');
+  assert(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
+  await p.close();
+});
+
+await test('analytics: form_start fires once; invalid submit does not fire form_submit', async () => {
+  const p = await openPage('/');
+  await p.eval(`document.getElementById('email').focus(); document.getElementById('first_name').focus(); true`);
+  await p.eval(fillAndSubmit('bad'));
+  await p.waitFor(isVisible('#email-error'));
+  const names = await p.eval(`window.__events.map(e => e.name)`);
+  assert(names.filter((n) => n === 'form_start').length === 1, 'form_start count: ' + names);
+  assert(!names.includes('form_submit'), 'form_submit must not fire on invalid input');
+  await p.close();
+});
+
+await test('analytics: server error fires form_error, not lead_success', async () => {
+  failPosts = true;
+  const p = await openPage(AD_B + '&__live=1');
+  await p.eval(fillAndSubmit('eva@example.cz'));
+  await p.waitFor(isVisible('#form-error'));
+  const names = await p.eval(`window.__events.map(e => e.name)`);
+  assert(names.includes('form_error') && !names.includes('lead_success'), 'events: ' + names);
+  failPosts = false;
+  await p.close();
+});
+
+await test('analytics: no GoatCounter loaded is harmless; source clicks and thank-you download tracked', async () => {
+  const p = await openPage('/');
+  await p.eval(BLOCK_NAV);
+  await p.eval(`document.querySelector('[data-track="source_click"]').click(); true`);
+  assert((await p.eval(`window.__events.map(e => e.name).join()`)) === 'source_click', 'source_click missing');
+  await p.goto('/dekujeme.html');
+  await p.eval(BLOCK_NAV);
+  await p.eval(`document.querySelector('[data-track="magnet_download"]').click(); true`);
+  assert((await p.eval(`window.__events.map(e => e.path).join()`)) === 'magnet_download/default', 'thank-you download not tracked');
+  assert((await p.eval(`document.querySelector('.debug-panel') === null`)), 'debug panel must be off by default');
+  assert(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
   await p.close();
 });
 

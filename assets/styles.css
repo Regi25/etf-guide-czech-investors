@@ -211,3 +211,12 @@ details p { padding: 0 1rem 1rem; margin: 0; }
 /* Keep anchor targets clear of the sticky header */
 section[id], #lead-success { scroll-margin-top: 4.5rem; }
 .lead-success h3 { margin-top: 0; }
+
+/* ?debug=1 event log */
+.debug-panel {
+  position: fixed; right: .5rem; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  max-width: min(18rem, calc(100% - 1rem)); max-height: 40vh; overflow: auto;
+  background: #111; color: #9fef9f; font: 12px/1.4 ui-monospace, Menlo, monospace;
+  padding: .5rem .75rem; border-radius: 8px; opacity: .92;
+}
+.debug-panel ol { margin: .25rem 0 0; padding-left: 1.25rem; }
