@@ -9,6 +9,7 @@
   <meta name="robots" content="noindex">
   <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#obsah">Přeskočit na obsah</a>
@@ -212,7 +213,62 @@
           <li>Kontrolní seznam o&nbsp;7&nbsp;bodech pro nákup ETF v&nbsp;aplikaci brokera</li>
           <li>Co je KID a&nbsp;proč ho hledat</li>
         </ul>
-        <div id="lead-slot"></div>
+        <!--
+          Lead form. DEMO MODE: no data-netlify attribute, so Netlify registers
+          no form and stores nothing. To go live (only after the privacy page
+          is completed), see README "Going live": add data-netlify="true" and
+          set data-lead-mode="live".
+        -->
+        <form id="lead-form" class="lead-form" name="lead" method="POST" action="/dekujeme.html"
+              data-lead-mode="demo" netlify-honeypot="company" novalidate>
+          <p class="demo-banner" data-demo-only>
+            <strong>Ukázkový režim:</strong> formulář zatím neukládá ani neodesílá žádné údaje. Tahák získáte hned po odeslání.
+          </p>
+          <input type="hidden" name="form-name" value="lead">
+          <p class="hp" aria-hidden="true">
+            <label>Nevyplňujte <input name="company" tabindex="-1" autocomplete="off"></label>
+          </p>
+
+          <div class="field">
+            <label for="email">E-mail <span aria-hidden="true">*</span></label>
+            <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required
+                   aria-describedby="email-error">
+            <p class="field-error" id="email-error" hidden>Zadejte prosím platný e-mail, například jana@example.cz.</p>
+          </div>
+          <div class="field">
+            <label for="first_name">Křestní jméno <span class="optional">(nepovinné)</span></label>
+            <input id="first_name" name="first_name" type="text" autocomplete="given-name">
+          </div>
+          <div class="field field-check">
+            <input id="marketing_consent" name="marketing_consent" type="checkbox" value="yes">
+            <label for="marketing_consent">Chci občas dostávat e-mailem novinky o&nbsp;ETF. <span class="optional">(nepovinné, tahák dostanete i&nbsp;bez toho)</span></label>
+          </div>
+
+          <!-- Attribution, filled in by assets/app.js -->
+          <input type="hidden" name="utm_source">
+          <input type="hidden" name="utm_medium">
+          <input type="hidden" name="utm_campaign">
+          <input type="hidden" name="utm_content">
+          <input type="hidden" name="utm_term">
+          <input type="hidden" name="gclid">
+          <input type="hidden" name="fbclid">
+          <input type="hidden" name="landing_variant">
+          <input type="hidden" name="landing_url">
+          <input type="hidden" name="referrer">
+          <input type="hidden" name="time_to_submit_ms">
+
+          <button class="btn btn-primary btn-block" type="submit">Získat tahák (PDF)</button>
+          <p class="form-error" id="form-error" role="alert" hidden>Odeslání se nepovedlo. Zkontrolujte připojení a&nbsp;zkuste to prosím znovu.</p>
+          <p class="form-note">Zpracování údajů: <a href="ochrana-udaju.html">informace o&nbsp;ochraně osobních údajů</a> (koncept).</p>
+          <noscript><p class="form-note">Bez JavaScriptu formulář v&nbsp;ukázkovém režimu nefunguje. <a href="dekujeme.html">Tahák najdete zde.</a></p></noscript>
+        </form>
+
+        <div id="lead-success" class="lead-success" tabindex="-1" hidden>
+          <h3>Hotovo, tahák je váš</h3>
+          <p>Stáhněte si ho hned. Nic dalšího nemusíte dělat.</p>
+          <a class="btn btn-primary btn-block" href="assets/tahak-etf.pdf" download data-track="magnet_download">Stáhnout tahák (PDF, 2&nbsp;strany)</a>
+          <p class="form-note" data-demo-only>Ukázkový režim: žádné údaje nebyly uloženy.</p>
+        </div>
       </div>
     </section>
 
