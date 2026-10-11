@@ -85,13 +85,18 @@ async function openPage(path, { width = 390, height = 844, mobile = true } = {})
   const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true });
   await cdp('Page.enable', {}, sessionId);
   await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile }, sessionId);
-  const loaded = new Promise((r) => {
-    const fn = (m) => { if (m.sessionId === sessionId && m.method === 'Page.loadEventFired') { listeners.splice(listeners.indexOf(fn), 1); r(); } };
-    listeners.push(fn);
-  });
-  await cdp('Page.navigate', { url: BASE + path }, sessionId);
-  await loaded;
+  const goto = async (p) => {
+    const loaded = new Promise((r) => {
+      const fn = (m) => { if (m.sessionId === sessionId && m.method === 'Page.loadEventFired') { listeners.splice(listeners.indexOf(fn), 1); r(); } };
+      listeners.push(fn);
+    });
+    await cdp('Page.navigate', { url: BASE + p }, sessionId);
+    await loaded;
+  };
+  await goto(path);
   const page = {
+    goto, // same tab, so sessionStorage is kept
+
     eval: async (expr) => {
       const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, sessionId);
       if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
@@ -210,6 +215,80 @@ await test('resource: PDF and thank-you page are served', async () => {
   assert(String.fromCharCode(...bytes.slice(0, 5)) === '%PDF-', 'not a PDF');
   const ty = await (await fetch(BASE + '/dekujeme.html')).text();
   assert(ty.includes('href="assets/tahak-etf.pdf"'), 'thank-you page lacks PDF link');
+});
+
+/* ---------- Tests: UTM attribution + headline variant ---------- */
+
+const AD_A = '/?utm_source=meta&utm_medium=paid_social&utm_campaign=etf_cz_2026q4&utm_content=ad_a_problem&fbclid=abc123';
+const AD_B = '/?utm_source=meta&utm_medium=paid_social&utm_campaign=etf_cz_2026q4&utm_content=ad_b_compare';
+const submitAndGetPayload = async (p) => {
+  await p.eval(fillAndSubmit('jana@example.cz'));
+  await p.waitFor(isVisible('#lead-success'));
+  return p.eval('window.__lastLeadPayload');
+};
+
+await test('utm: ad A link shows headline A and attaches attribution to the lead', async () => {
+  const p = await openPage(AD_A);
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'a', 'variant A not applied');
+  assert((await p.eval(`document.getElementById('hero-title').textContent`)).startsWith('Broker vám nedovolil'), 'headline A text');
+  const d = await submitAndGetPayload(p);
+  assert(d.utm_source === 'meta' && d.utm_medium === 'paid_social' && d.utm_campaign === 'etf_cz_2026q4', 'utm fields: ' + JSON.stringify(d));
+  assert(d.utm_content === 'ad_a_problem' && d.fbclid === 'abc123' && d.landing_variant === 'a', 'content/variant: ' + JSON.stringify(d));
+  assert(d.landing_url.includes('utm_content=ad_a_problem'), 'landing_url missing');
+  await p.close();
+});
+
+await test('utm: ad B link shows headline B', async () => {
+  const p = await openPage(AD_B);
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'b', 'variant B not applied');
+  const d = await submitAndGetPayload(p);
+  assert(d.utm_content === 'ad_b_compare' && d.landing_variant === 'b', 'variant B payload');
+  await p.close();
+});
+
+await test('utm: no parameters keeps default headline and empty attribution', async () => {
+  const p = await openPage('/');
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'default', 'should be default');
+  const d = await submitAndGetPayload(p);
+  assert(d.utm_source === '' && d.utm_content === '' && d.landing_variant === 'default', 'should be empty: ' + JSON.stringify(d));
+  await p.close();
+});
+
+await test('utm: attribution survives reload and navigation without parameters', async () => {
+  const p = await openPage(AD_B);
+  await p.goto('/dekujeme.html');
+  await p.goto('/');
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'b', 'variant lost after navigation');
+  const d = await submitAndGetPayload(p);
+  assert(d.utm_content === 'ad_b_compare' && d.utm_source === 'meta', 'attribution lost: ' + JSON.stringify(d));
+  await p.close();
+});
+
+await test('utm: first campaign touch wins; campaign replaces a direct visit', async () => {
+  const p = await openPage('/');
+  await p.goto(AD_A);
+  await p.goto(AD_B);
+  const d = await submitAndGetPayload(p);
+  assert(d.utm_content === 'ad_a_problem', 'expected first campaign (A), got ' + d.utm_content);
+  await p.close();
+});
+
+await test('utm: unknown utm_content falls back to default headline; values are length-capped', async () => {
+  const long = 'x'.repeat(500);
+  const p = await openPage(`/?utm_source=newsletter&utm_content=${long}`);
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'default', 'should be default');
+  const d = await submitAndGetPayload(p);
+  assert(d.utm_source === 'newsletter' && d.utm_content.length === 200, 'cap failed: ' + d.utm_content.length);
+  await p.close();
+});
+
+await test('live (mock Netlify): attribution reaches the submitted lead', async () => {
+  const p = await openPage(AD_A + '&__live=1');
+  await p.eval(fillAndSubmit('karel@example.cz'));
+  await p.waitFor(isVisible('#lead-success'));
+  const last = posts.at(-1);
+  assert(last.email === 'karel@example.cz' && last.utm_content === 'ad_a_problem' && last.landing_variant === 'a', 'POST lacks attribution: ' + JSON.stringify(last));
+  await p.close();
 });
 
 /* ---------- Report ---------- */

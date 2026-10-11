@@ -1,17 +1,83 @@
 /*
  * Landing-page behaviour. No dependencies.
- * Sections: lead form.
+ * Sections: attribution (UTM), headline variant, lead form.
  */
 (function () {
   'use strict';
 
   var pageLoadedAt = Date.now();
 
+  /* ---------- Attribution (first touch per browser session) ---------- */
+
+  var ATTR_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'];
+  var STORE_KEY = 'etf_attribution_v1';
+
+  function readStored() {
+    try { return JSON.parse(sessionStorage.getItem(STORE_KEY)); } catch (e) { return null; }
+  }
+  function store(value) {
+    try { sessionStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch (e) { /* storage blocked: URL values still apply */ }
+  }
+
+  var query = new URLSearchParams(window.location.search);
+  var fromUrl = {};
+  ATTR_KEYS.forEach(function (key) {
+    var value = query.get(key);
+    if (value) fromUrl[key] = value.slice(0, 200);
+  });
+  var hasUrlParams = Object.keys(fromUrl).length > 0;
+
+  // Keep the first touch of the session, but let a campaign visit replace a
+  // stored direct (parameter-less) visit.
+  var attribution = readStored();
+  if (!attribution || (hasUrlParams && Object.keys(attribution.params || {}).length === 0)) {
+    attribution = {
+      params: fromUrl,
+      landing_url: window.location.href.slice(0, 500),
+      referrer: document.referrer.slice(0, 500)
+    };
+    store(attribution);
+  }
+
+  /* ---------- Headline variant matched to the ad (utm_content) ---------- */
+
+  var VARIANTS = {
+    ad_a_problem: {
+      key: 'a',
+      title: 'Broker vám nedovolil koupit SPY nebo VOO? Tady je, co si můžete koupit místo nich.',
+      lead: 'Proč americké ETF v EU většinou nekoupíte a které evropské fondy UCITS sledují stejný index. Všechna čísla se zdroji.'
+    },
+    ad_b_compare: {
+      key: 'b',
+      title: 'S&P 500, nebo celý svět? 4 evropské ETF v jednom srovnání.',
+      lead: 'Roční náklady, ISIN, burzy a typ fondu, u každého údaje zdroj. Tahák v PDF zdarma.'
+    }
+  };
+  var variant = VARIANTS[attribution.params && attribution.params.utm_content];
+  var variantKey = variant ? variant.key : 'default';
+
+  var heroTitle = document.getElementById('hero-title');
+  var heroLead = document.getElementById('hero-lead');
+  if (variant && heroTitle && heroLead) {
+    heroTitle.textContent = variant.title;
+    heroLead.textContent = variant.lead;
+    heroTitle.setAttribute('data-variant', variant.key);
+  }
+
   /* ---------- Lead form ---------- */
 
   var form = document.getElementById('lead-form');
   var success = document.getElementById('lead-success');
   if (!form || !success) return;
+
+  function fillAttributionFields() {
+    ATTR_KEYS.forEach(function (key) {
+      form.elements[key].value = (attribution.params && attribution.params[key]) || '';
+    });
+    form.elements.landing_variant.value = variantKey;
+    form.elements.landing_url.value = attribution.landing_url || '';
+    form.elements.referrer.value = attribution.referrer || '';
+  }
 
   var email = form.elements.email;
   var emailError = document.getElementById('email-error');
@@ -77,6 +143,7 @@
     }
     setEmailError(false);
 
+    fillAttributionFields();
     form.elements.time_to_submit_ms.value = String(Date.now() - pageLoadedAt);
 
     submitBtn.disabled = true;
