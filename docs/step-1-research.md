@@ -96,7 +96,7 @@ All three rows are **[PRIMARY]**. Correction: VOO was **[UNVERIFIED]** in the fi
 3. https://www.ishares.com/uk/individual/en/literature/fact-sheet/swda-ishares-core-msci-world-ucits-etf-fund-fact-sheet-en-gb.pdf. Data "as at 05-Oct-2026"; net assets "as at 30-Sep-2026".
 4. https://fund-docs.vanguard.com/FTSE_All-World_UCITS_ETF_USD_Accumulating_9679_CH_RET_EN.pdf. Data as at 31 Aug 2026. The UK product page (product ID 9679) also shows 0.14%. It was fetched as https://www.vanguard.co.uk/professional/product/etf/equity/9679/sp-500-ucits-etf-usd-accumulating; the slug in that URL is wrong, but the page served is FTSE All-World. Use a canonical URL on the site.
 
-Ticker/exchange rows: the iShares rows come from the factsheets' listing tables and the iShares UK page. The Vanguard rows come from Vanguard's NL and UK product pages **[PRIMARY]**. The Xetra tickers SXR8 and EUNL come from justETF only **[SECONDARY]**. The iShares factsheets list "Deutsche Boerse Xetra" without the ticker in the extracted text.
+Ticker/exchange rows: the iShares rows come from the factsheets' listing tables and the iShares UK page. The Vanguard rows come from Vanguard's NL and UK product pages **[PRIMARY]**. SXR8 and EUNL: shown next to the matching ISINs on iShares' German product pages (https://www.ishares.com/de/privatanleger/de/produkte/253743/… and …/251882/…) **[PRIMARY]**, data audit 2026-10-11. The iShares UK factsheets list "Deutsche Boerse Xetra" among the exchanges **[PRIMARY]**. That SXR8/EUNL are specifically the *Xetra* tickers comes from justETF only **[SECONDARY]**. iShares' German factsheet URLs returned an error page.
 
 **Index descriptions used on the page** (added 2026-10-11 during milestone 1):
 - S&P 500: "an index composed of 500 large cap U.S. companies". Source: iShares CSPX product page, investment objective **[PRIMARY]**.
@@ -171,3 +171,10 @@ Static HTML, CSS and vanilla JS with no build step. Netlify Forms stores leads. 
   - BOND removed. DIP removed (out of scope).
   - EU-access claims split into primary, secondary and unverified, with approved page wording.
   - Added the IBKR source.
+- 2026-10-11 v3 (data audit):
+  - Every displayed value was re-checked against the issuer factsheets. All match.
+  - Tickers SXR8/EUNL were confirmed on iShares DE pages; the Xetra pairing is still justETF only.
+  - The MSCI World phrase "large and mid cap" is sourced to MSCI (index provider), not the fund manager.
+  - The VOO size date (30 Jun 2026) is the factsheet header date.
+  - The page sentence "Všechny údaje jsme ověřili … u správců fondů" was not literally true. It was replaced with approved wording, and the exceptions are starred and explained on the page and in the PDF.
+  - The owner independently checked VWCE OCF 0.14 %, SPY 0.0945 % and CSPX TER 0.07 % against issuer sources; all matched.

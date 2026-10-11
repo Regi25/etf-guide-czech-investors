@@ -44,7 +44,10 @@ All figures were checked on **2026-10-11** against issuer factsheets and pages, 
 Deliberate content rules:
 - **No past performance** in the MVP, to avoid implied performance promises.
 - **No broker names** and **no claim that a fund is available to every Czech investor**. The page says US ETFs are "usually" unavailable to EU retail clients because of missing KIDs, and asks readers to check with their broker. Czech registration and Czech-language KIDs of the UCITS funds are **unverified**.
-- Two tickers (SXR8, EUNL) come from justETF, not the issuer. They are marked with `*` on the page.
+- **Exceptions are marked with `*`** on the page and explained in one footnote (`#pozn-vyjimky`). The page sentence says the fund data was verified "ve factsheetech a na webech správců fondů" (in the managers' factsheets and websites) and that exceptions are starred. The exceptions are:
+  - **SXR8 and EUNL:** iShares' German product pages show both tickers next to the right ISINs. That they are the *Xetra* tickers comes only from justETF.
+  - **MSCI World "velké a střední firmy"** (large and mid caps): this phrase comes from the index provider MSCI, not the fund manager. "Rozvinuté trhy" (developed markets) is in the iShares factsheet as well.
+- **VOO's size** has no date of its own in Vanguard's factsheet. The date shown (30. 6. 2026) is the factsheet's header date ("As of June 30, 2026").
 
 ## Design decisions
 
