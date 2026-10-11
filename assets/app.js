@@ -130,10 +130,14 @@
     if (el) track(el.getAttribute('data-track'));
   });
 
-  // Comparison seen: the US table or the first fund card is at least half
-  // visible. Both count, because after the "Zobrazit srovnání" jump a phone
-  // shows the table while the first card is still below the fold.
-  var comparisonTargets = document.querySelectorAll('#srovnani .table-scroll, #srovnani .card');
+  // Comparison seen: the first US fund row or the first fund card is at least
+  // half visible. The row (not the whole table) is observed because on phones
+  // the table is stacked and too tall to be half visible after the
+  // "Zobrazit srovnání" jump, while the first card is still below the fold.
+  var comparisonTargets = [
+    document.querySelector('#srovnani .data-table tbody tr'),
+    document.querySelector('#srovnani .card')
+  ].filter(Boolean);
   if (comparisonTargets.length && 'IntersectionObserver' in window) {
     var seen = new IntersectionObserver(function (entries) {
       // Check the ratio explicitly instead of relying on isIntersecting.
@@ -142,8 +146,7 @@
         seen.disconnect();
       }
     }, { threshold: 0.5 });
-    seen.observe(comparisonTargets[0]);
-    if (comparisonTargets[1]) seen.observe(comparisonTargets[1]);
+    comparisonTargets.forEach(function (el) { seen.observe(el); });
   }
 
   /* ---------- Lead form ---------- */

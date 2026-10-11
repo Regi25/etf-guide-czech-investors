@@ -107,6 +107,7 @@ async function openPage(path, { width = 390, height = 844, mobile = true } = {})
   const page = {
     goto, // same tab, so sessionStorage is kept
     errors,
+    cdp: (method, params = {}) => cdp(method, params, sessionId),
 
     eval: async (expr) => {
       const r = await cdp('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, sessionId);
@@ -395,6 +396,18 @@ for (const [width, height] of [[390, 844], [360, 640], [1280, 800]]) {
   });
 }
 
+await test('analytics 320x640: the jump alone shows <50% of the first fund row (no event); scrolling it into view fires comparison_view', async () => {
+  const p = await openPage('/', { width: 320, height: 640 });
+  await p.eval(`document.querySelector('.hero [data-track="compare_click"]').click(); true`);
+  await settle(1500);
+  const ratio = await p.eval(`(() => { const b = document.querySelector('#srovnani .data-table tbody tr').getBoundingClientRect(); return (Math.min(b.bottom, innerHeight) - Math.max(b.top, 0)) / b.height; })()`);
+  assert(ratio < 0.5, 'setup: expected the first row under half visible after the jump, got ' + ratio.toFixed(2));
+  assert(!(await names(p)).includes('comparison_view'), 'fired with the first row only ' + ratio.toFixed(2) + ' visible');
+  await p.eval(`document.documentElement.style.scrollBehavior = 'auto'; window.scrollBy(0, 150); true`);
+  await p.waitFor(`window.__events.some(e => e.name === 'comparison_view')`, 2000);
+  await p.close();
+});
+
 await test('analytics: a 20px peek of the comparison does not count as comparison_view', async () => {
   const p = await openPage('/');
   await p.eval(`document.documentElement.style.scrollBehavior = 'auto';
@@ -440,6 +453,77 @@ await test('utm: short values a and b are not variants (only ad_a_problem / ad_b
   for (const v of ['a', 'b', 'A', 'ad_a']) {
     const p = await openPage('/?utm_content=' + v);
     assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'default', v + ' should be default');
+    await p.close();
+  }
+});
+
+/* ---------- Tests: US table on narrow screens (M1) ---------- */
+
+// Geometry of the US table: horizontal scrolling, cells outside the container,
+// labels that collide with values, and links outside the viewport.
+const US_TABLE_GEOMETRY = `(() => {
+  const ts = document.querySelector('#srovnani .table-scroll'), box = ts.getBoundingClientRect();
+  const cells = [...ts.querySelectorAll('tbody th, tbody td')];
+  const outside = cells.filter((c) => { const b = c.getBoundingClientRect(); return b.left < box.left - 0.5 || b.right > box.right + 0.5; }).length;
+  const tds = [...ts.querySelectorAll('tbody td')];
+  const labelInfo = tds.map((td) => {
+    const lab = getComputedStyle(td, '::before');
+    const range = document.createRange(); range.selectNodeContents(td);
+    const first = range.getClientRects()[0];
+    const tdLeft = td.getBoundingClientRect().left;
+    return { label: lab.content.replace(/^"|"$/g, ''), expected: td.dataset.label, labelRight: parseFloat(lab.left) + parseFloat(lab.width), valueLeft: first ? first.left - tdLeft : 0 };
+  });
+  const links = [...ts.querySelectorAll('a')].map((a) => { const b = a.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.width > 0 && b.height > 0; });
+  return { scrolls: ts.scrollWidth > ts.clientWidth, pageScrolls: document.documentElement.scrollWidth > innerWidth, outside, labelInfo, linksVisible: links.every(Boolean), linkCount: links.length, display: getComputedStyle(tds[0]).display };
+})()`;
+
+for (const [width, height] of [[320, 640], [360, 800], [390, 844]]) {
+  await test(`layout ${width}x${height}: US table shows every field without horizontal scrolling`, async () => {
+    const p = await openPage('/', { width, height });
+    const g = await p.eval(US_TABLE_GEOMETRY);
+    assert(g.display === 'block', 'expected stacked layout, got display ' + g.display);
+    assert(!g.scrolls && !g.pageScrolls, 'horizontal scrolling present');
+    assert(g.outside === 0, g.outside + ' cells outside the table container');
+    assert(g.labelInfo.length === 15, 'expected 15 data cells, got ' + g.labelInfo.length);
+    for (const l of g.labelInfo) {
+      assert(l.label === l.expected, `visible label "${l.label}" != data-label "${l.expected}"`);
+      assert(l.labelRight <= l.valueLeft + 0.5, `label "${l.label}" overlaps its value`);
+    }
+    assert(g.linkCount === 3 && g.linksVisible, 'source links not fully visible');
+    await p.close();
+  });
+}
+
+for (const [width, height] of [[768, 1024], [1280, 800]]) {
+  await test(`layout ${width}x${height}: US table keeps its table layout with visible column headers`, async () => {
+    const p = await openPage('/', { width, height, mobile: false });
+    const g = await p.eval(US_TABLE_GEOMETRY);
+    assert(g.display === 'table-cell', 'expected table layout, got ' + g.display);
+    assert(!g.scrolls && g.outside === 0, 'table overflows its container');
+    const headers = await p.eval(`[...document.querySelectorAll('#srovnani thead th')].map(th => th.getBoundingClientRect().height > 10)`);
+    assert(headers.length === 6 && headers.every(Boolean), 'column headers not visible');
+    await p.close();
+  });
+}
+
+await test('layout: every data-label matches its column header text', async () => {
+  const p = await openPage('/');
+  const mismatches = await p.eval(`(() => {
+    const heads = [...document.querySelectorAll('#srovnani thead th')].map(th => th.textContent.trim());
+    return [...document.querySelectorAll('#srovnani tbody tr')].flatMap(tr => [...tr.children].slice(1).map((td, i) => td.dataset.label === heads[i + 1] ? null : (td.dataset.label + ' vs ' + heads[i + 1]))).filter(Boolean);
+  })()`);
+  assert(mismatches.length === 0, 'mismatches: ' + mismatches.join(', '));
+  await p.close();
+});
+
+await test('a11y (Chrome): native table semantics are kept in the stacked mobile layout', async () => {
+  for (const [width, mobile] of [[360, true], [1280, false]]) {
+    const p = await openPage('/', { width, height: 800, mobile });
+    await p.cdp('Accessibility.enable');
+    const { nodes } = await p.cdp('Accessibility.getFullAXTree');
+    const count = (role) => nodes.filter((n) => !n.ignored && n.role?.value === role).length;
+    const got = { table: count('table'), columnheader: count('columnheader'), rowheader: count('rowheader'), cell: count('cell') };
+    assert(got.table === 1 && got.columnheader === 6 && got.rowheader === 3 && got.cell === 15, `${width}px roles: ` + JSON.stringify(got));
     await p.close();
   }
 });

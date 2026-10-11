@@ -54,7 +54,7 @@ Deliberate content rules:
 
 ## Design decisions
 
-- **Mobile-first, one column.** Fund data is shown as cards with a label/value list on phones and two columns from 768px. The US table is short and scrolls inside its own container, so the page never scrolls sideways (checked at 320–1280px).
+- **Mobile-first, one column.** Fund data is shown as cards with a label/value list on phones and two columns from 768px. The US table (SPY, IVV, VOO) is a real table from 768px up. Below that, the same markup is restyled with CSS so each fund row stacks into a labelled block (labels from `data-label`), and every field, including the founding date, size and source, is readable without sideways scrolling (checked at 320–1280px).
 - **The S&P 500 vs global split is a visual structure**, not a footnote: separate headings, a "širší rozložení" (broader diversification) tag and an explicit "nejsou přímo srovnatelné" (not directly comparable) sentence.
 - **Trust before the ask:** the PRIIPs explanation and the sourced comparison come before the form. Sources sit directly under each card.
 - **System fonts, no third-party assets.** This keeps the page fast and avoids sending visitor data to font CDNs.
@@ -97,7 +97,7 @@ All funnel events, including the landing page view, are recorded by one function
 | `page_view/<v>` | landing page (`index.html`) loaded; always the first event. Not fired on the thank-you page. |
 | `cta_click/<v>` | hero or header CTA ("Stáhnout tahák zdarma (PDF)", "Tahák zdarma") clicked |
 | `compare_click/<v>` | hero button "Zobrazit srovnání" clicked |
-| `comparison_view/<v>` | the US table **or** the first fund card is at least 50 % visible (once). The table counts too because after the "Zobrazit srovnání" jump a phone shows the table while the first card is still below the fold. |
+| `comparison_view/<v>` | the **first US ETF table row** (`#srovnani .data-table tbody tr`) **or** the **first UCITS fund card** (`#srovnani .card`) is at least 50 % visible (once). The row is used, not the whole table, because on phones the stacked table is too tall to be half visible after the "Zobrazit srovnání" jump. On a 320px-wide phone the jump shows less than half of that row, so the event fires after a short further scroll. |
 | `form_start/<v>` | first focus in the form (once) |
 | `form_submit/<v>` | submit with valid input |
 | `lead_success/<v>` | lead accepted (Netlify 2xx; in demo mode: simulated) |
@@ -168,7 +168,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 28 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 36 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -185,9 +185,15 @@ To regenerate the PDF after editing `tahak.html`:
   - full funnel order starting with `page_view`, with variant tags;
   - `page_view` only on the landing page;
   - "Zobrazit srovnání" fires `compare_click` and then `comparison_view` at 390×844, 360×640 and 1280×800;
+  - at 320×640 the jump alone does not fire `comparison_view`, but a short further scroll does;
   - no `comparison_view` on load or on a small peek;
   - events queued until GoatCounter loads, and no errors without it.
 - **Debug panel:** shows `page_view` on load, explains an unrecognised `utm_content`, and renders the URL value as text, never as HTML.
+- **Mobile layout:**
+  - the US table shows every field without horizontal scrolling at 320, 360 and 390px;
+  - it keeps its table layout at 768 and 1280px;
+  - every `data-label` matches its column header;
+  - Chrome keeps the native table semantics (column and row headers, cells) in the stacked layout.
 - **CSP:** no CSP or console errors on any page.
 
 ## Deployment (Netlify)
@@ -215,7 +221,7 @@ Do this only after the privacy details are confirmed.
 ## What was tested, and what was not
 
 Tested locally:
-- 28/28 e2e tests pass.
+- 36/36 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.

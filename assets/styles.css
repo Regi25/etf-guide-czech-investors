@@ -128,6 +128,29 @@ small { color: var(--muted); font-size: .85em; }
 .data-table thead th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .data-table tbody tr:last-child > * { border-bottom: 0; }
 
+/* Narrow screens: the same table, each fund row stacked into a labelled
+   block, so no column is hidden behind horizontal scrolling. Labels come
+   from data-label; values and links stay in the original cells. */
+@media (max-width: 47.9375rem) {
+  .data-table { min-width: 0; }
+  .data-table thead {
+    /* Visually hidden, still available to assistive technology. */
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  .data-table, .data-table tbody, .data-table tr, .data-table th, .data-table td { display: block; }
+  .data-table tbody tr { padding: .75rem; border-bottom: 1px solid var(--border); }
+  .data-table tbody tr:last-child { border-bottom: 0; }
+  .data-table tbody th { padding: 0 0 .35rem; border-bottom: 0; }
+  .data-table td { position: relative; padding: .4rem 0 .4rem 7rem; border-bottom: 0; }
+  .data-table tbody tr > td:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .data-table td::before {
+    content: attr(data-label);
+    position: absolute; left: 0; top: .4rem; width: 6.5rem;
+    white-space: nowrap; color: var(--muted);
+  }
+}
+
 /* UCITS cards */
 .cards { display: grid; gap: 1rem; grid-template-columns: 1fr; }
 .card {
