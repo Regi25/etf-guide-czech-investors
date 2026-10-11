@@ -528,6 +528,54 @@ await test('a11y (Chrome): native table semantics are kept in the stacked mobile
   }
 });
 
+/* ---------- Tests: UCITS fund cards (M3) ---------- */
+
+await test('cards: ticker leads each heading; fee and index come first; all 9 facts kept', async () => {
+  const p = await openPage('/');
+  const cards = await p.eval(`[...document.querySelectorAll('#srovnani .card')].map(c => ({
+    first: c.querySelector('h4').firstElementChild?.className,
+    heading: c.querySelector('h4').textContent.replace(/\\s+/g, ' ').trim(),
+    labelledby: c.getAttribute('aria-labelledby') === c.querySelector('h4').id,
+    dts: [...c.querySelectorAll('.facts > div > dt')].map(dt => dt.textContent.trim()),
+    keys: [...c.querySelectorAll('.facts > .fact-key > dt')].map(dt => dt.textContent.trim()) }))`);
+  assert(cards.length === 4, 'expected 4 cards, got ' + cards.length);
+  const tickers = ['CSPX', 'VUAA', 'SWDA', 'VWCE'];
+  cards.forEach((c, i) => {
+    assert(c.first === 'card-ticker' && c.heading.startsWith(tickers[i] + ' '), 'heading: ' + c.heading);
+    assert(c.labelledby, 'aria-labelledby no longer points at the heading');
+    assert(c.dts.length === 9, c.heading + ': ' + c.dts.length + ' facts');
+    assert(c.keys.length === 2 && c.keys[0].startsWith('Roční náklady') && c.keys[1] === 'Index', 'key facts: ' + c.keys.join(', '));
+    assert(c.dts[0].startsWith('Roční náklady') && c.dts[1] === 'Index', 'key facts not first');
+  });
+  await p.close();
+});
+
+for (const [width, height] of [[320, 640], [360, 800], [390, 844]]) {
+  await test(`cards ${width}x${height}: no overflow; fee emphasised; source links are 44px rows with tracking`, async () => {
+    const p = await openPage('/', { width, height });
+    const r = await p.eval(`(() => {
+      const cards = [...document.querySelectorAll('#srovnani .card')];
+      const outside = cards.flatMap(c => { const cb = c.getBoundingClientRect(); return [...c.querySelectorAll('*')].filter(el => { const b = el.getBoundingClientRect(); return b.width && (b.right > cb.right + 0.5 || b.left < cb.left - 0.5); }); }).length;
+      const links = cards.flatMap(c => [...c.querySelectorAll('.card-src a')]);
+      return {
+        pageScrolls: document.documentElement.scrollWidth > innerWidth,
+        outside,
+        feePx: cards.map(c => parseFloat(getComputedStyle(c.querySelector('.fact-key:first-child dd')).fontSize)),
+        bodyPx: parseFloat(getComputedStyle(document.body).fontSize),
+        links: links.map(a => ({ h: a.getBoundingClientRect().height, inView: a.getBoundingClientRect().right <= innerWidth, track: a.dataset.track, ext: a.target === '_blank' && a.rel === 'noopener' })),
+      };
+    })()`);
+    assert(!r.pageScrolls && r.outside === 0, `overflow: page ${r.pageScrolls}, elements outside cards ${r.outside}`);
+    assert(r.feePx.every((f) => f >= 1.4 * r.bodyPx), 'fee not emphasised: ' + r.feePx.join(','));
+    assert(r.links.length === 9, 'expected 9 source links, got ' + r.links.length);
+    for (const l of r.links) {
+      assert(l.h >= 44, 'source link only ' + l.h + 'px tall');
+      assert(l.inView && l.track === 'source_click' && l.ext, 'link attributes or position changed: ' + JSON.stringify(l));
+    }
+    await p.close();
+  });
+}
+
 /* ---------- Tests: production headers ---------- */
 
 await test('csp: every page loads with the production CSP and no console errors', async () => {
