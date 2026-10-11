@@ -144,7 +144,6 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 const fillAndSubmit = (email, { consent = false, honeypot = '' } = {}) => `(() => {
   const f = document.getElementById('lead-form');
   f.elements.email.value = ${JSON.stringify(email)};
-  f.elements.first_name.value = 'Jana';
   f.elements.marketing_consent.checked = ${consent};
   f.elements.company.value = ${JSON.stringify(honeypot)};
   f.querySelector('button[type=submit]').click();
@@ -336,7 +335,7 @@ await test('analytics: full funnel fires events in order, tagged with the varian
 
 await test('analytics: form_start fires once; invalid submit does not fire form_submit', async () => {
   const p = await openPage('/');
-  await p.eval(`document.getElementById('email').focus(); document.getElementById('first_name').focus(); true`);
+  await p.eval(`document.getElementById('email').focus(); document.getElementById('marketing_consent').focus(); true`);
   await p.eval(fillAndSubmit('bad'));
   await p.waitFor(isVisible('#email-error'));
   const names = await p.eval(`window.__events.map(e => e.name)`);
@@ -396,14 +395,23 @@ for (const [width, height] of [[390, 844], [360, 640], [1280, 800]]) {
   });
 }
 
-await test('analytics 320x640: the jump alone shows <50% of the first fund row (no event); scrolling it into view fires comparison_view', async () => {
-  const p = await openPage('/', { width: 320, height: 640 });
-  await p.eval(`document.querySelector('.hero [data-track="compare_click"]').click(); true`);
-  await settle(1500);
-  const ratio = await p.eval(`(() => { const b = document.querySelector('#srovnani .data-table tbody tr').getBoundingClientRect(); return (Math.min(b.bottom, innerHeight) - Math.max(b.top, 0)) / b.height; })()`);
-  assert(ratio < 0.5, 'setup: expected the first row under half visible after the jump, got ' + ratio.toFixed(2));
-  assert(!(await names(p)).includes('comparison_view'), 'fired with the first row only ' + ratio.toFixed(2) + ' visible');
-  await p.eval(`document.documentElement.style.scrollBehavior = 'auto'; window.scrollBy(0, 150); true`);
+for (const [width, height] of [[320, 640], [375, 667]]) {
+  await test(`analytics ${width}x${height}: "Zobrazit srovnání" jump alone fires comparison_view (first fund's key facts)`, async () => {
+    const p = await openPage('/', { width, height });
+    await settle();
+    assert(!(await names(p)).includes('comparison_view'), 'fired before the jump');
+    await p.eval(`document.querySelector('.hero [data-track="compare_click"]').click(); true`);
+    await p.waitFor(`window.__events.some(e => e.name === 'comparison_view')`, 4000);
+    await p.close();
+  });
+}
+
+await test('analytics 320x568 (4-inch phone): the jump shows only the section intro; a short scroll fires comparison_view', async () => {
+  const p = await openPage('/', { width: 320, height: 568 });
+  await p.eval(`document.documentElement.style.scrollBehavior = 'auto'; document.querySelector('.hero [data-track="compare_click"]').click(); true`);
+  await settle(400);
+  assert(!(await names(p)).includes('comparison_view'), 'unexpectedly fired on the jump at 320x568');
+  await p.eval(`window.scrollBy(0, 120); true`);
   await p.waitFor(`window.__events.some(e => e.name === 'comparison_view')`, 2000);
   await p.close();
 });
@@ -411,21 +419,21 @@ await test('analytics 320x640: the jump alone shows <50% of the first fund row (
 await test('analytics: a 20px peek of the comparison does not count as comparison_view', async () => {
   const p = await openPage('/');
   await p.eval(`document.documentElement.style.scrollBehavior = 'auto';
-    window.scrollTo(0, document.querySelector('#srovnani .table-scroll').getBoundingClientRect().top + scrollY - innerHeight + 20); true`);
+    window.scrollTo(0, document.querySelector('#srovnani .card .fact-key').getBoundingClientRect().top + scrollY - innerHeight + 20); true`);
   await settle();
   assert(!(await names(p)).includes('comparison_view'), 'fired at 20px: ' + (await names(p)));
   await p.close();
 });
 
 await test('analytics: comparison already peeking 20px at page load does not count (initial observer callback)', async () => {
-  // Measure where the table starts, then load with a viewport that ends 20px below that.
+  // Measure where the first key facts start, then load with a viewport that ends 20px below that.
   const probe = await openPage('/');
-  const tableTop = await probe.eval(`Math.round(document.querySelector('#srovnani .table-scroll').getBoundingClientRect().top + scrollY)`);
+  const keyTop = await probe.eval(`Math.round(document.querySelector('#srovnani .card .fact-key').getBoundingClientRect().top + scrollY)`);
   await probe.close();
-  const p = await openPage('/', { width: 390, height: tableTop + 20 });
+  const p = await openPage('/', { width: 390, height: keyTop + 20 });
   await settle();
-  const visible = await p.eval(`Math.round(innerHeight - document.querySelector('#srovnani .table-scroll').getBoundingClientRect().top)`);
-  assert(visible > 0 && visible < 60, 'setup: table should peek slightly, visible px = ' + visible);
+  const visible = await p.eval(`Math.round(innerHeight - document.querySelector('#srovnani .card .fact-key').getBoundingClientRect().top)`);
+  assert(visible > 0 && visible < 40, 'setup: key facts should peek slightly, visible px = ' + visible);
   assert(!(await names(p)).includes('comparison_view'), 'fired on a small peek at load: ' + (await names(p)));
   await p.close();
 });
@@ -480,6 +488,8 @@ const US_TABLE_GEOMETRY = `(() => {
 for (const [width, height] of [[320, 640], [360, 800], [390, 844]]) {
   await test(`layout ${width}x${height}: US table shows every field without horizontal scrolling`, async () => {
     const p = await openPage('/', { width, height });
+    assert((await p.eval(`document.getElementById('americke-etf').open`)) === false, 'US disclosure should start closed on phones');
+    await p.eval(`document.querySelector('#americke-etf > summary').click(); true`);
     const g = await p.eval(US_TABLE_GEOMETRY);
     assert(g.display === 'block', 'expected stacked layout, got display ' + g.display);
     assert(!g.scrolls && !g.pageScrolls, 'horizontal scrolling present');
@@ -497,6 +507,7 @@ for (const [width, height] of [[320, 640], [360, 800], [390, 844]]) {
 for (const [width, height] of [[768, 1024], [1280, 800]]) {
   await test(`layout ${width}x${height}: US table keeps its table layout with visible column headers`, async () => {
     const p = await openPage('/', { width, height, mobile: false });
+    assert((await p.eval(`document.getElementById('americke-etf').open`)) === true, 'US disclosure should be open from 48rem');
     const g = await p.eval(US_TABLE_GEOMETRY);
     assert(g.display === 'table-cell', 'expected table layout, got ' + g.display);
     assert(!g.scrolls && g.outside === 0, 'table overflows its container');
@@ -519,6 +530,8 @@ await test('layout: every data-label matches its column header text', async () =
 await test('a11y (Chrome): native table semantics are kept in the stacked mobile layout', async () => {
   for (const [width, mobile] of [[360, true], [1280, false]]) {
     const p = await openPage('/', { width, height: 800, mobile });
+    await p.eval(`document.getElementById('americke-etf').open = true; true`);
+    await settle(200);
     await p.cdp('Accessibility.enable');
     const { nodes } = await p.cdp('Accessibility.getFullAXTree');
     const count = (role) => nodes.filter((n) => !n.ignored && n.role?.value === role).length;
@@ -572,6 +585,133 @@ for (const [width, height] of [[320, 640], [360, 800], [390, 844]]) {
       assert(l.h >= 44, 'source link only ' + l.h + 'px tall');
       assert(l.inView && l.track === 'source_click' && l.ext, 'link attributes or position changed: ' + JSON.stringify(l));
     }
+    await p.close();
+  });
+}
+
+/* ---------- Tests: M4 mobile conversion ---------- */
+
+// Fee shown in a fund card, e.g. "0,07 %" for CSPX.
+const CARD_FEES = `Object.fromEntries([...document.querySelectorAll('#srovnani .card')].map(c => [c.querySelector('.card-ticker').textContent, c.querySelector('.fact-key dd').textContent.replace(/\\u00a0/g, ' ').trim()]))`;
+const norm = (t) => t.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+
+for (const [variant, path, mustInclude] of [
+  ['default', '/', ['SPY / VOO', 'CSPX', 'VUAA', 'S&P 500']],
+  ['a', AD_A, ['SPY / VOO', 'CSPX', 'VUAA', 'S&P 500']],
+  ['b', AD_B, ['S&P 500 (jen USA)', 'CSPX', 'VUAA', 'SWDA', 'VWCE', 'Širší rozložení']],
+]) {
+  for (const [width, height] of [[320, 640], [375, 667]]) await test(`teaser (${variant}) ${width}x${height}: matches the ad, fees equal the fund cards, sources linked, teaser + CTA on the first screen`, async () => {
+    const p = await openPage(path, { width, height });
+    const t = norm(await p.eval(`document.getElementById('hero-teaser').textContent`));
+    for (const m of mustInclude) assert(t.includes(m), `teaser lacks "${m}": ${t}`);
+    const fees = await p.eval(CARD_FEES);
+    for (const [ticker, fee] of Object.entries(fees)) {
+      if (!t.includes(ticker)) continue;
+      // The fee printed next to the ticker (or for the CSPX/VUAA pair) must be the card's value.
+      assert(t.includes(fee), `teaser mentions ${ticker} but not its card fee ${fee}: ${t}`);
+    }
+    if (variant === 'b') assert(!/celý svět/.test(t), 'B teaser must not call MSCI World "the whole world"');
+    assert((await p.eval(`document.querySelector('.hero-teaser-src a').getAttribute('href')`)) === '#srovnani', 'source link');
+    const fold = await p.eval(`(() => { const r = el => el.getBoundingClientRect(); return { teaser: r(document.getElementById('hero-teaser')).bottom, cta: r(document.querySelector('.hero .btn-primary')).bottom, vh: innerHeight }; })()`);
+    assert(fold.teaser <= fold.vh && fold.cta <= fold.vh, `teaser/CTA below the first screen: ${JSON.stringify(fold)}`);
+    await p.close();
+  });
+}
+
+await test('comparison order: UCITS cards first, US ETFs after them in a disclosure; Podrobnosti hold the secondary facts', async () => {
+  const p = await openPage('/', { width: 375, height: 667 });
+  const r = await p.eval(`(() => {
+    const sec = document.getElementById('srovnani');
+    const firstCard = sec.querySelector('.card'), us = document.getElementById('americke-etf');
+    const more = [...sec.querySelectorAll('.card details.card-more')];
+    return {
+      cardsBeforeUs: !!(firstCard.compareDocumentPosition(us) & Node.DOCUMENT_POSITION_FOLLOWING),
+      usTag: us.tagName, usOpen: us.open, usSummary: us.querySelector('summary').textContent.replace(/\\s+/g, ' ').trim(),
+      usHasTable: !!us.querySelector('table.data-table'),
+      moreCount: more.length, moreOpen: more.some(d => d.open), moreLabels: [...new Set(more.map(d => d.querySelector('summary').textContent.trim()))],
+      moreDts: more.map(d => [...d.querySelectorAll('dt')].map(dt => dt.textContent.trim()).join('|')),
+      visibleDts: [...sec.querySelector('.card').querySelectorAll(':scope > .facts > div > dt')].map(dt => dt.textContent.trim()),
+    };
+  })()`);
+  assert(r.cardsBeforeUs, 'UCITS cards must come before the US ETFs');
+  assert(r.usTag === 'DETAILS' && !r.usOpen && r.usSummary.startsWith('Americké ETF pro srovnání') && r.usHasTable, 'US disclosure: ' + JSON.stringify(r));
+  assert(r.moreCount === 4 && !r.moreOpen && r.moreLabels.join() === 'Podrobnosti', 'Podrobnosti: ' + JSON.stringify(r));
+  for (const d of r.moreDts) assert(d === 'Sídlo fondu|Replikace|Vznik třídy|Velikost třídy', 'secondary facts: ' + d);
+  assert(r.visibleDts.join('|') === 'Roční náklady (TER)|Index|ISIN|Výnosy|Příklady tickerů', 'visible facts: ' + r.visibleDts.join('|'));
+  await p.close();
+});
+
+await test('disclosures: open from 48rem; on phones they toggle with the keyboard (Enter)', async () => {
+  const wide = await openPage('/', { width: 1280, height: 800, mobile: false });
+  assert((await wide.eval(`[...document.querySelectorAll('details[data-open-wide]')].every(d => d.open)`)), 'not all disclosures open on desktop');
+  await wide.close();
+  const p = await openPage('/', { width: 375, height: 667 });
+  for (const sel of ['#americke-etf > summary', '#srovnani .card details.card-more > summary']) {
+    await p.eval(`document.querySelector(${JSON.stringify(sel)}).focus(); true`);
+    assert((await p.eval(`document.activeElement === document.querySelector(${JSON.stringify(sel)})`)), sel + ' not focusable');
+    await p.cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+    await p.cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await settle(150);
+    assert((await p.eval(`document.querySelector(${JSON.stringify(sel)}).parentElement.open`)), sel + ' did not open with Enter');
+  }
+  await p.close();
+});
+
+await test('lead form: first-name field removed and not submitted', async () => {
+  const p = await openPage('/');
+  assert((await p.eval(`document.querySelectorAll('[name="first_name"], #first_name').length`)) === 0, 'first-name field still present');
+  const d = await submitAndGetPayload(p);
+  assert(!('first_name' in d) && d.email === 'jana@example.cz', 'payload: ' + JSON.stringify(d));
+  await p.close();
+});
+
+await test('PDF preview: real image from the PDF, alt text, intrinsic size, beside the list on phones', async () => {
+  const p = await openPage('/', { width: 375, height: 667 });
+  await p.eval(`document.querySelector('.magnet-preview').scrollIntoView(); true`);
+  await p.waitFor(`document.querySelector('.magnet-preview').complete && document.querySelector('.magnet-preview').naturalWidth > 0`, 4000);
+  const r = await p.eval(`(() => { const img = document.querySelector('.magnet-preview'), list = document.querySelector('.magnet .ticks'); const a = img.getBoundingClientRect(), b = list.getBoundingClientRect();
+    return { src: img.getAttribute('src'), alt: img.alt, w: img.getAttribute('width'), h: img.getAttribute('height'), natural: img.naturalWidth + 'x' + img.naturalHeight, loading: img.loading, besideList: a.left >= b.right - 1 && a.top < b.bottom, inView: a.right <= innerWidth, cssW: Math.round(a.width) }; })()`);
+  assert(r.src === 'assets/tahak-nahled.jpg' && r.alt.startsWith('Náhled první strany taháku') && r.w && r.h && r.loading === 'lazy', JSON.stringify(r));
+  assert(r.besideList && r.inView && r.cssW >= 80, 'layout: ' + JSON.stringify(r));
+  const res = await fetch(BASE + '/assets/tahak-nahled.jpg');
+  const size = (await res.arrayBuffer()).byteLength;
+  assert(res.ok && size < 60 * 1024, 'preview missing or too large: ' + size + ' bytes');
+  await p.close();
+});
+
+await test('anchor jumps land flush under the sticky header (no paper strip above the comparison)', async () => {
+  const p = await openPage('/', { width: 375, height: 667 });
+  await p.eval(`document.documentElement.style.scrollBehavior = 'auto'; document.querySelector('.hero [data-track="compare_click"]').click(); true`);
+  await settle(300);
+  const gap = await p.eval(`Math.round(document.getElementById('srovnani').getBoundingClientRect().top - document.querySelector('.site-header').getBoundingClientRect().bottom) + 0`);
+  assert(Math.abs(gap) <= 1, 'gap between header and comparison: ' + gap + 'px');
+  await p.close();
+});
+
+await test('form inputs: boundary contrast at least 3:1 in light and dark', async () => {
+  for (const scheme of ['light', 'dark']) {
+    const p = await openPage('/');
+    await p.cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+    const ratio = await p.eval(`(() => {
+      const rgb = s => s.match(/\\d+/g).slice(0, 3).map(Number);
+      const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; const [r, g, b] = c.map(f); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const input = document.getElementById('email');
+      const border = rgb(getComputedStyle(input).borderTopColor), bg = rgb(getComputedStyle(input).backgroundColor), form = rgb(getComputedStyle(input.closest('form')).backgroundColor);
+      const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+      return Math.min(cr(border, bg), cr(border, form));
+    })()`);
+    assert(ratio >= 3, `${scheme}: input border contrast ${ratio.toFixed(2)}`);
+    await p.close();
+  }
+});
+
+for (const [width, height] of [[320, 640], [375, 667], [390, 844], [768, 1024], [1280, 800]]) {
+  await test(`layout ${width}x${height}: no horizontal overflow anywhere, with every disclosure open`, async () => {
+    const p = await openPage('/', { width, height, mobile: width < 768 });
+    await p.eval(`document.querySelectorAll('details').forEach(d => d.open = true); true`);
+    await settle(150);
+    const r = await p.eval(`(() => ({ page: document.documentElement.scrollWidth > innerWidth, els: [...document.querySelectorAll('body *')].filter(el => !el.closest('.table-scroll') && el.getBoundingClientRect().right > innerWidth + 1).map(el => el.tagName + '.' + el.className).slice(0, 5) }))()`);
+    assert(!r.page && r.els.length === 0, 'overflow: ' + JSON.stringify(r));
     await p.close();
   });
 }

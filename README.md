@@ -54,7 +54,7 @@ Deliberate content rules:
 
 ## Design decisions
 
-- **Mobile-first, one column.** Fund data is shown as cards with a label/value list on phones and two columns from 768px. The US table (SPY, IVV, VOO) is a real table from 768px up. Below that, the same markup is restyled with CSS so each fund row stacks into a labelled block (labels from `data-label`), and every field, including the founding date, size and source, is readable without sideways scrolling (checked at 320–1280px).
+- **Mobile-first, one column.** The comparison leads with the European UCITS funds: cards with a label/value list on phones, two columns from 768px. On phones, each card's secondary facts (domicile, replication, share-class launch, size) sit in a native „Podrobnosti" disclosure. The US ETFs (SPY, IVV, VOO) follow in a disclosure „Americké ETF pro srovnání". `app.js` opens all of these disclosures from 48rem, so desktop shows everything. No data or source link is removed. The US table is a real table from 768px up. Below that, the same markup is restyled with CSS so each fund row stacks into a labelled block (labels from `data-label`), and every field, including the founding date, size and source, is readable without sideways scrolling (checked at 320–1280px).
 - **The S&P 500 vs global split is a visual structure**, not a footnote: separate headings, a "širší rozložení" (broader diversification) tag and an explicit "nejsou přímo srovnatelné" (not directly comparable) sentence.
 - **Trust before the ask:** the PRIIPs explanation and the sourced comparison come before the form. Sources sit directly under each card.
 - **System fonts, no third-party assets.** This keeps the page fast and avoids sending visitor data to font CDNs.
@@ -64,8 +64,9 @@ Deliberate content rules:
 ## Conversion decisions
 
 - **Message match:** `utm_content` switches the hero headline to match the ad that was clicked (A: problem, B: comparison). Only the exact values `ad_a_problem` and `ad_b_compare` are recognised (see [Ad variants and links](#ad-variants-and-links)). Any other value, or none, shows a neutral default.
+- **Teaser above the fold:** below the subheadline, a one-line answer to the ad's promise with sourced fees: A (and default) „Místo SPY / VOO: CSPX nebo VUAA — stejný index S&P 500, roční náklady 0,07 %", B „S&P 500 (jen USA): CSPX a VUAA, 0,07 % ročně. Širší rozložení: SWDA 0,20 %, VWCE 0,14 % ročně". A source line links to the comparison. A test checks that every fee in the teaser equals the fee shown in that fund's card.
 - **CTA above the fold** on a 390px phone, repeated in the sticky header ("Tahák zdarma").
-- **Short form:** e-mail (required) and first name (optional). **Marketing consent is a separate, optional, unchecked box**; the PDF is given either way.
+- **Short form:** e-mail only (required). The unused first-name field was removed. **Marketing consent is a separate, optional, unchecked box**; the PDF is given either way.
 - **Immediate delivery:** after submit the form is replaced by a download button. There is no e-mail round-trip and no double opt-in wait.
 - **Friction-free errors:** a Czech inline validation message, and on a network error the typed values are kept.
 - **Spam:** Netlify honeypot plus a recorded `time_to_submit_ms` for later filtering. Nothing is blocked on timing, which avoids false positives. No CAPTCHA.
@@ -97,7 +98,7 @@ All funnel events, including the landing page view, are recorded by one function
 | `page_view/<v>` | landing page (`index.html`) loaded; always the first event. Not fired on the thank-you page. |
 | `cta_click/<v>` | hero or header CTA ("Stáhnout tahák zdarma (PDF)", "Tahák zdarma") clicked |
 | `compare_click/<v>` | hero button "Zobrazit srovnání" clicked |
-| `comparison_view/<v>` | the **first US ETF table row** (`#srovnani .data-table tbody tr`) **or** the **first UCITS fund card** (`#srovnani .card`) is at least 50 % visible (once). The row is used, not the whole table, because on phones the stacked table is too tall to be half visible after the "Zobrazit srovnání" jump. On a 320px-wide phone the jump shows less than half of that row, so the event fires after a short further scroll. |
+| `comparison_view/<v>` | the **first UCITS fund's key facts** (annual costs, `#srovnani .card .fact-key`) are at least 50 % visible (once). This small element comes right after the section intro, so the "Zobrazit srovnání" jump reaches it on 320×640 and larger screens. On a 320×568 phone the intro fills the screen after the jump, and the event fires after a short further scroll. |
 | `form_start/<v>` | first focus in the form (once) |
 | `form_submit/<v>` | submit with valid input |
 | `lead_success/<v>` | lead accepted (Netlify 2xx; in demo mode: simulated) |
@@ -157,6 +158,7 @@ assets/app.js         attribution, headline variant, analytics, form
 assets/styles.css     site styles (light/dark)
 assets/tahak.css      cheat-sheet print styles
 assets/tahak-etf.pdf  lead magnet
+assets/tahak-nahled.jpg  preview of PDF page 1 (rendered from the PDF)
 ads/                  ad-a / ad-b as HTML + 1080x1350 PNG
 tests/e2e.mjs         dependency-free browser tests (Node 22+, Chrome)
 netlify.toml          Netlify config, CSP and security headers
@@ -168,7 +170,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 36 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 59 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -184,8 +186,8 @@ To regenerate the PDF after editing `tahak.html`:
 - **Analytics:**
   - full funnel order starting with `page_view`, with variant tags;
   - `page_view` only on the landing page;
-  - "Zobrazit srovnání" fires `compare_click` and then `comparison_view` at 390×844, 360×640 and 1280×800;
-  - at 320×640 the jump alone does not fire `comparison_view`, but a short further scroll does;
+  - "Zobrazit srovnání" fires `compare_click` and then `comparison_view` at 1280×800, 390×844, 375×667, 360×640 and 320×640;
+  - at 320×568 the jump alone does not fire `comparison_view`, but a short further scroll does;
   - no `comparison_view` on load or on a small peek;
   - events queued until GoatCounter loads, and no errors without it.
 - **Debug panel:** shows `page_view` on load, explains an unrecognised `utm_content`, and renders the URL value as text, never as HTML.
@@ -193,7 +195,15 @@ To regenerate the PDF after editing `tahak.html`:
   - the US table shows every field without horizontal scrolling at 320, 360 and 390px;
   - it keeps its table layout at 768 and 1280px;
   - every `data-label` matches its column header;
-  - Chrome keeps the native table semantics (column and row headers, cells) in the stacked layout.
+  - Chrome keeps the native table semantics (column and row headers, cells) in the stacked layout;
+  - no horizontal overflow at 320, 375, 390, 768 and 1280px with every disclosure open.
+- **Conversion (M4):**
+  - the teaser for the default, A and B variants: text, fees equal to the fund cards, source link, and teaser plus primary CTA on the first 320×640 and 375×667 screen;
+  - UCITS cards before the US ETFs; the disclosures are closed on phones, open from 48rem and toggle with Enter;
+  - the first-name field is gone and not submitted;
+  - the PDF preview loads, has alt text, sits beside the list and is under 60 KB;
+  - anchor jumps land flush under the sticky header;
+  - form input borders have at least 3:1 contrast in light and dark.
 - **CSP:** no CSP or console errors on any page.
 
 ## Deployment (Netlify)
@@ -221,7 +231,7 @@ Do this only after the privacy details are confirmed.
 ## What was tested, and what was not
 
 Tested locally:
-- 36/36 e2e tests pass.
+- 59/59 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.

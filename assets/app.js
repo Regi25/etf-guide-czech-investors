@@ -1,6 +1,6 @@
 /*
  * Landing-page behaviour. No dependencies.
- * Sections: attribution (UTM), headline variant, lead form.
+ * Sections: attribution (UTM), headline variant, disclosures, analytics, lead form.
  */
 (function () {
   'use strict';
@@ -45,12 +45,17 @@
     ad_a_problem: {
       key: 'a',
       title: 'Broker vám nedovolil koupit SPY nebo VOO? Tady je, co si můžete koupit místo nich.',
-      lead: 'Proč americké ETF v EU většinou nekoupíte a které evropské fondy UCITS sledují stejný index. Všechna čísla se zdroji.'
+      lead: 'Proč americké ETF v EU většinou nekoupíte a které evropské fondy UCITS sledují stejný index. Všechna čísla se zdroji.',
+      // Fees: CSPX TER 0.07 %, VUAA OCF 0.07 % (issuer factsheets, docs/step-1-research.md §4c).
+      teaser: 'Místo SPY / VOO: CSPX nebo VUAA — stejný index S&P\u00a0500, roční náklady 0,07\u00a0%.'
     },
     ad_b_compare: {
       key: 'b',
       title: 'S&P 500, nebo celý svět? 4 evropské ETF v jednom srovnání.',
-      lead: 'Roční náklady, ISIN, burzy a typ fondu, u každého údaje zdroj. Tahák v PDF zdarma.'
+      lead: 'Roční náklady, ISIN, burzy a typ fondu, u každého údaje zdroj. Tahák v PDF zdarma.',
+      // Fees: CSPX/VUAA 0.07 %, SWDA TER 0.20 %, VWCE OCF 0.14 % (issuer factsheets, §4c).
+      // MSCI World covers developed markets only, so it is "broader", not "the whole world".
+      teaser: 'S&P\u00a0500 (jen USA): CSPX a VUAA, 0,07\u00a0% ročně. Širší rozložení: SWDA 0,20\u00a0%, VWCE 0,14\u00a0% ročně.'
     }
   };
   var variant = VARIANTS[attribution.params && attribution.params.utm_content];
@@ -58,11 +63,26 @@
 
   var heroTitle = document.getElementById('hero-title');
   var heroLead = document.getElementById('hero-lead');
+  var heroTeaser = document.getElementById('hero-teaser');
   if (variant && heroTitle && heroLead) {
     heroTitle.textContent = variant.title;
     heroLead.textContent = variant.lead;
+    if (heroTeaser) heroTeaser.textContent = variant.teaser;
     heroTitle.setAttribute('data-variant', variant.key);
   }
+
+  /* ---------- Disclosures: open on wide screens ---------- */
+
+  // details[data-open-wide] (US ETF table, fund "Podrobnosti") stay collapsed on
+  // phones and open from 48rem, matching the CSS breakpoint. Closing is left to
+  // the visitor, so a resize never hides something they opened.
+  var wideQuery = window.matchMedia ? window.matchMedia('(min-width: 48rem)') : null;
+  function openOnWide() {
+    if (!wideQuery || !wideQuery.matches) return;
+    document.querySelectorAll('details[data-open-wide]').forEach(function (d) { d.open = true; });
+  }
+  openOnWide();
+  if (wideQuery && wideQuery.addEventListener) wideQuery.addEventListener('change', openOnWide);
 
   /* ---------- Analytics (GoatCounter, cookieless) ---------- */
 
@@ -130,14 +150,11 @@
     if (el) track(el.getAttribute('data-track'));
   });
 
-  // Comparison seen: the first US fund row or the first fund card is at least
-  // half visible. The row (not the whole table) is observed because on phones
-  // the table is stacked and too tall to be half visible after the
-  // "Zobrazit srovnání" jump, while the first card is still below the fold.
-  var comparisonTargets = [
-    document.querySelector('#srovnani .data-table tbody tr'),
-    document.querySelector('#srovnani .card')
-  ].filter(Boolean);
+  // Comparison seen: the first fund's key facts (annual costs) are at least
+  // half visible. This small element comes right after the section intro, so
+  // the "Zobrazit srovnání" jump reaches it even on short phone screens; the
+  // US table now sits in a disclosure after the UCITS funds.
+  var comparisonTargets = [document.querySelector('#srovnani .card .fact-key')].filter(Boolean);
   if (comparisonTargets.length && 'IntersectionObserver' in window) {
     var seen = new IntersectionObserver(function (entries) {
       // Check the ratio explicitly instead of relying on isIntersecting.
