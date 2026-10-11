@@ -64,7 +64,7 @@ Deliberate content rules:
 ## Conversion decisions
 
 - **Message match:** `utm_content` switches the hero headline to match the ad that was clicked (A: problem, B: comparison). Only the exact values `ad_a_problem` and `ad_b_compare` are recognised (see [Ad variants and links](#ad-variants-and-links)). Any other value, or none, shows a neutral default.
-- **Teaser above the fold:** below the subheadline, a one-line answer to the ad's promise with sourced fees: A (and default) „Místo SPY / VOO: CSPX nebo VUAA — stejný index S&P 500, roční náklady 0,07 %", B „S&P 500 (jen USA): CSPX a VUAA, 0,07 % ročně. Širší rozložení: SWDA 0,20 %, VWCE 0,14 % ročně". A source line links to the comparison. A test checks that every fee in the teaser equals the fee shown in that fund's card.
+- **Teaser above the fold:** below the subheadline, a one-line answer to the ad's promise with sourced fees: A (and default) „Místo SPY / VOO: CSPX nebo VUAA — stejný index S&P 500, roční náklady 0,07 %", B „S&P 500 (jen USA): CSPX a VUAA, 0,07 % ročně. Globální akcie: SWDA (rozvinuté trhy) 0,20 %, VWCE (vč. rozvíjejících se) 0,14 % ročně". A source line links to the comparison. A test checks that every fee in the teaser equals the fee shown in that fund's card.
 - **CTA above the fold** on a 390px phone, repeated in the sticky header ("Tahák zdarma").
 - **Short form:** e-mail only (required). The unused first-name field was removed. **Marketing consent is a separate, optional, unchecked box**; the PDF is given either way.
 - **Immediate delivery:** after submit the form is replaced by a download button. There is no e-mail round-trip and no double opt-in wait.
@@ -132,7 +132,7 @@ Every Netlify submission (and its CSV export) therefore carries its ad.
 | Ad | Image | `utm_content` | Headline shown | Event suffix |
 |---|---|---|---|---|
 | A: problem | `ads/ad-a.png` | `ad_a_problem` | „Broker vám nedovolil koupit SPY nebo VOO? Tady je, co si můžete koupit místo nich." | `/a` |
-| B: comparison | `ads/ad-b.png` | `ad_b_compare` | „S&P 500, nebo celý svět? 4 evropské ETF v jednom srovnání." | `/b` |
+| B: comparison | `ads/ad-b.png` | `ad_b_compare` | „S&P 500, nebo globální akcie? 4 evropské ETF v jednom srovnání." | `/b` |
 | none or anything else (e.g. `a`, `b`, `A`, `ad_a`) | — | — | default headline from `index.html` | `/default` |
 
 Full ad URLs. The site is not deployed yet, so replace `YOUR-SITE.netlify.app` with the real Netlify domain:
@@ -248,6 +248,7 @@ Tested locally:
 
 ## Known limitations
 
+- **Collapsible sections and JavaScript:** „Podrobnosti" and „Americké ETF pro srovnání" are native `<details>` elements. They open and close without JavaScript on every screen size, with mouse, touch or keyboard. Only their automatic opening from 768px (48rem) needs `assets/app.js`. Without JavaScript, desktop visitors see them collapsed and can open them with one click.
 - **Headline variant swap:** the default headline can flash briefly before `app.js` swaps in A/B, because the script is deferred. Server-side or edge rendering would remove this.
 - **No e-mail delivery:** the PDF is downloaded on the page. Leads are only stored (once live), not e-mailed.
 - **The PDF is not truly gated:** it is a static file. This is acceptable for a free resource.

@@ -598,7 +598,7 @@ const norm = (t) => t.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
 for (const [variant, path, mustInclude] of [
   ['default', '/', ['SPY / VOO', 'CSPX', 'VUAA', 'S&P 500']],
   ['a', AD_A, ['SPY / VOO', 'CSPX', 'VUAA', 'S&P 500']],
-  ['b', AD_B, ['S&P 500 (jen USA)', 'CSPX', 'VUAA', 'SWDA', 'VWCE', 'Širší rozložení']],
+  ['b', AD_B, ['S&P 500 (jen USA)', 'CSPX', 'VUAA', 'Globální akcie', 'SWDA (rozvinuté trhy)', 'VWCE (vč. rozvíjejících se)']],
 ]) {
   for (const [width, height] of [[320, 640], [375, 667]]) await test(`teaser (${variant}) ${width}x${height}: matches the ad, fees equal the fund cards, sources linked, teaser + CTA on the first screen`, async () => {
     const p = await openPage(path, { width, height });
@@ -610,7 +610,11 @@ for (const [variant, path, mustInclude] of [
       // The fee printed next to the ticker (or for the CSPX/VUAA pair) must be the card's value.
       assert(t.includes(fee), `teaser mentions ${ticker} but not its card fee ${fee}: ${t}`);
     }
-    if (variant === 'b') assert(!/celý svět/.test(t), 'B teaser must not call MSCI World "the whole world"');
+    if (variant === 'b') {
+      assert(!/celý svět/.test(t), 'B teaser must not call MSCI World "the whole world"');
+      const h1 = norm(await p.eval(`document.querySelector('h1').textContent`));
+      assert(h1 === 'S&P 500, nebo globální akcie? 4 evropské ETF v jednom srovnání.', 'B headline: ' + h1);
+    }
     assert((await p.eval(`document.querySelector('.hero-teaser-src a').getAttribute('href')`)) === '#srovnani', 'source link');
     const fold = await p.eval(`(() => { const r = el => el.getBoundingClientRect(); return { teaser: r(document.getElementById('hero-teaser')).bottom, cta: r(document.querySelector('.hero .btn-primary')).bottom, vh: innerHeight }; })()`);
     assert(fold.teaser <= fold.vh && fold.cta <= fold.vh, `teaser/CTA below the first screen: ${JSON.stringify(fold)}`);
@@ -656,6 +660,35 @@ await test('disclosures: open from 48rem; on phones they toggle with the keyboar
   }
   await p.close();
 });
+
+for (const [width, height] of [[320, 640], [375, 667], [390, 844]]) {
+  await test(`Podrobnosti ${width}x${height}: all four collapsed by default; each toggles with Enter and Space; expanded state exposed`, async () => {
+    const p = await openPage('/', { width, height });
+    assert((await p.eval(`[...document.querySelectorAll('#srovnani details.card-more')].map(d => d.open).join()`)) === 'false,false,false,false', 'not all collapsed');
+    await p.cdp('Accessibility.enable');
+    const expandedStates = async () => (await p.cdp('Accessibility.getFullAXTree')).nodes
+      .filter((n) => !n.ignored && (n.name?.value || '') === 'Podrobnosti' && (n.properties || []).some((x) => x.name === 'expanded'))
+      .map((n) => n.properties.find((x) => x.name === 'expanded').value.value);
+    assert((await expandedStates()).join() === 'false,false,false,false', 'AX expanded before: ' + (await expandedStates()).join());
+    const key = async (k, code, text) => {
+      await p.cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32, text });
+      await p.cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: k === 'Enter' ? 13 : 32 });
+      await settle(120);
+    };
+    for (let i = 0; i < 4; i++) {
+      const open = `document.querySelectorAll('#srovnani details.card-more')[${i}].open`;
+      await p.eval(`document.querySelectorAll('#srovnani details.card-more > summary')[${i}].focus(); true`);
+      await key('Enter', 'Enter', '\r');
+      assert(await p.eval(open), `card ${i + 1}: Enter did not open`);
+      await key(' ', 'Space', ' ');
+      assert(!(await p.eval(open)), `card ${i + 1}: Space did not close`);
+      await key(' ', 'Space', ' ');
+      assert(await p.eval(open), `card ${i + 1}: Space did not open`);
+    }
+    assert((await expandedStates()).join() === 'true,true,true,true', 'AX expanded after: ' + (await expandedStates()).join());
+    await p.close();
+  });
+}
 
 await test('lead form: first-name field removed and not submitted', async () => {
   const p = await openPage('/');

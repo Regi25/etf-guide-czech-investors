@@ -51,11 +51,11 @@
     },
     ad_b_compare: {
       key: 'b',
-      title: 'S&P 500, nebo celý svět? 4 evropské ETF v jednom srovnání.',
+      title: 'S&P\u00a0500, nebo globální akcie? 4\u00a0evropské ETF v\u00a0jednom srovnání.',
       lead: 'Roční náklady, ISIN, burzy a typ fondu, u každého údaje zdroj. Tahák v PDF zdarma.',
       // Fees: CSPX/VUAA 0.07 %, SWDA TER 0.20 %, VWCE OCF 0.14 % (issuer factsheets, §4c).
-      // MSCI World covers developed markets only, so it is "broader", not "the whole world".
-      teaser: 'S&P\u00a0500 (jen USA): CSPX a VUAA, 0,07\u00a0% ročně. Širší rozložení: SWDA 0,20\u00a0%, VWCE 0,14\u00a0% ročně.'
+      // MSCI World = developed markets only; FTSE All-World = developed + emerging. Say which is which.
+      teaser: 'S&P\u00a0500 (jen USA): CSPX a VUAA, 0,07\u00a0% ročně. Globální akcie: SWDA (rozvinuté trhy) 0,20\u00a0%, VWCE (vč. rozvíjejících se) 0,14\u00a0% ročně.'
     }
   };
   var variant = VARIANTS[attribution.params && attribution.params.utm_content];
