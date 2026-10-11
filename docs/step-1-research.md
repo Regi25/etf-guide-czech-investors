@@ -98,6 +98,11 @@ All three rows are **[PRIMARY]**. Correction: VOO was **[UNVERIFIED]** in the fi
 
 Ticker/exchange rows: the iShares rows come from the factsheets' listing tables and the iShares UK page. The Vanguard rows come from Vanguard's NL and UK product pages **[PRIMARY]**. The Xetra tickers SXR8 and EUNL come from justETF only **[SECONDARY]**. The iShares factsheets list "Deutsche Boerse Xetra" without the ticker in the extracted text.
 
+**Index descriptions used on the page** (added 2026-10-11 during milestone 1):
+- S&P 500: "an index composed of 500 large cap U.S. companies". Source: iShares CSPX product page, investment objective **[PRIMARY]**.
+- MSCI World: large and mid cap representation across "Developed Markets countries", covering about 85% of free-float-adjusted market cap in each country. Source: https://www.msci.com/indexes/index/990100 **[PRIMARY]**.
+- FTSE All-World: "large and mid-sized company stocks in developed and emerging markets". Source: Vanguard VWCE factsheet, footnote 4 **[PRIMARY]**.
+
 **Corrections from the first version**:
 - Fund sizes now come from issuer documents with as-of dates, replacing justETF's undated EUR figures.
 - CSPX: the fund launch (18 May 2010) and share-class launch (19 May 2010) are now distinguished.
