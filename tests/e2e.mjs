@@ -18,6 +18,9 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
 
 /* ---------- Local server with a mock form endpoint ---------- */
 
+// Serve pages with the same CSP as production (netlify.toml) so violations surface in tests.
+const CSP = (await readFile(join(ROOT, 'netlify.toml'), 'utf8')).match(/Content-Security-Policy = "([^"]+)"/)[1];
+
 const posts = [];
 let failPosts = false;
 
@@ -37,7 +40,7 @@ const server = createServer(async (req, res) => {
     if (path.endsWith('.html') && url.searchParams.has('__live')) {
       data = Buffer.from(data.toString().replace('data-lead-mode="demo"', 'data-lead-mode="live" data-netlify="true"'));
     }
-    res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' }).end(data);
+    res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream', 'Content-Security-Policy': CSP }).end(data);
   } catch {
     res.writeHead(404).end('not found');
   }
@@ -85,9 +88,11 @@ async function openPage(path, { width = 390, height = 844, mobile = true } = {})
   const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true });
   await cdp('Page.enable', {}, sessionId);
   await cdp('Runtime.enable', {}, sessionId);
+  await cdp('Log.enable', {}, sessionId);
   const errors = [];
   listeners.push((m) => {
     if (m.sessionId === sessionId && m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
+    if (m.sessionId === sessionId && m.method === 'Log.entryAdded' && m.params.entry.level === 'error') errors.push(m.params.entry.text);
   });
   await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile }, sessionId);
   const goto = async (p) => {
@@ -362,6 +367,17 @@ await test('analytics: no GoatCounter loaded is harmless; source clicks and than
   assert((await p.eval(`document.querySelector('.debug-panel') === null`)), 'debug panel must be off by default');
   assert(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
   await p.close();
+});
+
+/* ---------- Tests: production headers ---------- */
+
+await test('csp: every page loads with the production CSP and no console errors', async () => {
+  for (const path of ['/', '/?utm_content=ad_b_compare&debug=1', '/dekujeme.html', '/ochrana-udaju.html', '/tahak.html']) {
+    const p = await openPage(path);
+    await new Promise((r) => setTimeout(r, 300));
+    assert(p.errors.length === 0, path + ' errors: ' + p.errors.join(' | '));
+    await p.close();
+  }
 });
 
 /* ---------- Report ---------- */
