@@ -353,4 +353,11 @@ Tested locally:
 
 Built with Claude Code. Session exports created with `/export` are stored unedited in [`ai-log/`](ai-log/) (`*.txt`). [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md) is a separate written summary of decisions and corrections, drafted with Claude and reviewed by the owner. It is not an export.
 
-The current export covers the session up to the MVP (11:30). The later milestones (M1–M5) still need a fresh `/export`, which only the owner can run.
+There are two genuine exports of the same Claude Code session. They are **cumulative**: each `/export` contains the whole conversation from its first prompt up to the moment of export.
+
+| File | Covers | Note |
+|---|---|---|
+| `2026-10-11-research-and-mvp.txt` | Session start through the MVP summary (11:30 on 2026-10-11) | First export |
+| `2026-10-11-m1-to-m5.txt` | Session start through the Meta ad-copy commit (exported 2026-10-11, 15:26) | Includes everything in the first export, then M1–M5. The name refers to the part it adds. |
+
+Neither file was edited, trimmed or merged; the overlap is kept as exported. Work after the second export is not in any export yet: the pre-submission audit and the demo-form safety fix, recorded in Git history. A later `/export` under a new filename would add it without overwriting either file.
