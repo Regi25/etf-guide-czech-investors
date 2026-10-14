@@ -86,7 +86,7 @@ Each entry: **what happened**, **how it was detected**, **how it was resolved**,
 - They checked the debug panel only after a scripted funnel, never in its state right after page load.
 
 **How it was resolved**
-- Commit `637b21c`:
+- Commit `53d3275`:
   - `page_view/<variant>` is recorded through `track()` on the landing page;
   - the compare button records `compare_click`;
   - `comparison_view` fires when the US table or the first fund card is at least 50% visible;
@@ -120,7 +120,7 @@ By measuring before implementing. The proposed change would still have failed on
 **How it was resolved**
 - `comparison_view` now fires when **either** the US table **or** the first fund card is at least 50% visible.
 - Tests cover all three viewport sizes.
-- The change of plan and its reason were reported to the owner in the summary of commit `637b21c`.
+- The change of plan and its reason were reported to the owner in the summary of commit `53d3275`.
 
 **Lesson**
 Measure the real layout before choosing a visibility threshold. A fix that sounds right ("use the first card") can still miss the case it was meant to fix.
@@ -147,7 +147,7 @@ Measure the real layout before choosing a visibility threshold. A fix that sound
 - The explicit `intersectionRatio >= 0.5` check was kept as a defensive measure.
 - The code comment was reworded so it no longer claims a bug.
 - The "small peek" tests were kept as plain behaviour checks, explicitly not as proof of a fixed bug.
-- The correction was stated to the owner in the summary of commit `637b21c`.
+- The correction was stated to the owner in the summary of commit `53d3275`.
 - **Known limitation:** Safari and Firefox have not been tested, neither the observer behaviour nor the page in general. All automated tests and both manual checks used Chrome.
 
 **Lesson**
@@ -182,3 +182,86 @@ This entry was requested by the owner as a process note. The later manual check 
 **Lesson**
 - When an instruction allows continuing "if the previous milestone works", "works" was judged by Claude's own tests only. For anything with user-visible behaviour (headlines, tracking, forms), pausing for a short human check after the first interactive milestone would likely have surfaced entry 2 earlier.
 - Automated tests by the implementer complement a human review; they do not replace it.
+
+---
+
+> Entries 6–9 were drafted on 2026-10-14 from the conversation, the tests and the Git history, and reviewed by the owner.
+
+## 6. M2–M3: design tokens, ticker-first cards, and a regex bug in Claude's own test
+
+**What happened**
+- **M2 (`ef4a9ce`):** editorial design tokens and serif headings.
+  - Before choosing the serif stack, Claude asked Chrome (via the DevTools protocol) which font rendered a Czech test string. Iowan Old Style, Charter, Georgia, Times New Roman and the system sans all rendered it without a fallback font.
+  - Noto Serif, Android's usual serif, was not installed, so Chrome substituted Times. Android was therefore not verified.
+- **M3 (`25c7853`):** fund cards lead with the ticker, show annual costs and index as key facts, and list source links as 44 px rows.
+- **Regex bug in Claude's own test.** A new card test normalised whitespace with `/\s+/` inside a JavaScript template string, where `\s` becomes a plain "s". The test removed every lowercase "s" from the heading text. It passed on the new markup only by coincidence.
+
+**How it was detected**
+- The regex bug showed up during a mutation run (the new tests run against the old markup). The failure message printed the heading as "iShare  Core…".
+
+**How it was resolved**
+- The regex was corrected to `/\\s+/`.
+- The approved M2 stylesheet had been stored as Git object `4ed8f16` before M3 started. M2 was committed alone from that object; its snapshot passed its own suite (36/36) in a temporary export. M3 was committed separately (40/40).
+- The owner tested M3 by hand before approving: "I tested the page and I like the result."
+
+**Lesson**
+- Escape sequences inside template strings in test code are easy to get wrong. Mutation runs, i.e. running new tests against the old code, catch tests that pass for the wrong reason.
+
+## 7. M4: mobile conversion, a real visual artefact, and several test-side mistakes
+
+**What happened (`d131d6c`)**
+- **Teaser.** A sourced teaser was added below the hero. On 320×640 it pushed variant A's primary CTA below the first screen. A smaller h1 scale and tighter hero spacing brought it back. It remains below the fold at 320×568 for variant A.
+- **Comparison order.** UCITS cards now come first; the US ETFs and the per-card „Podrobnosti" moved into native `<details>` disclosures. `comparison_view` was moved to the first fund's key facts. At 320×568 it fires only after a short scroll, and a test documents this.
+- **Beige band.** The owner asked Claude to inspect a beige band below the header. It turned out to be real. `scroll-margin-top` was 72 px but the header is 53 px, so after anchor jumps a 19 px strip of the previous section showed. The margin now matches the header height; a test checks the gap.
+- **`text-wrap: balance`** improved most headings but added a fourth line to the „Americké ETF pro srovnání" summary heading at 375/390 px, so it was switched off for that heading.
+- **Mistakes on the test and screenshot side, not product bugs:**
+  - `Math.round(-0.3)` returns −0, which DevTools cannot return by value, so a test saw `undefined`;
+  - synthetic Enter key presses need `text: "\r"` to activate an element;
+  - an accessibility-tree filter matched text nodes as well as the disclosure;
+  - the first full-page screenshots were taken before the lazy-loaded PDF preview had loaded, so they showed an empty area. They were regenerated.
+
+**How it was detected**
+- Measurements in headless Chrome at 320–1280 px, the failing tests, and Claude's own review of the screenshots.
+
+**Lesson**
+- Measure the real layout, e.g. where the CTA ends, before and after adding content.
+- When a test fails, check the test before concluding the product is broken: three of the M4 failures were in the tests.
+
+## 8. Pre-M5 wording corrections and M5: ads and PDF
+
+**What happened**
+- **Wording (`0211d3b`).** The owner asked to replace „celý svět" ("whole world") with „globální akcie" ("global equities") for variant B. MSCI World covers developed markets only, so "whole world" was inaccurate for SWDA. The B teaser now names each global fund's coverage.
+- **Regenerated files.** The ad B PNG, the PDF and its preview were regenerated in the same commit, so the commit has no stale generated files.
+- **PDF page count (M5, `403915c`).** Restyling the PDF first pushed it to **3 pages**: two lines of the footnote overflowed. Tighter page-1 spacing brought it back to 2 pages, and a test now checks that the PDF has exactly 2 pages and that all 13 source URLs are clickable links.
+- **PDF link test.** It initially failed because Chrome stores a bare origin with a trailing slash (`https://www.justetf.com/`).
+- **Ad A** had a large empty band above the CTA. The eyebrow line from ad B was added for balance.
+- **`ai-log/README.md`** said nothing in the folder was written by hand, although `DECISIONS.md` is a written summary. It was corrected.
+
+**How it was detected**
+- Page count read with macOS PDFKit; screenshots reviewed by Claude; the failing test; the owner's wording request.
+
+**Lesson**
+- A restyle can change pagination. A "2 pages" promise in the UI („PDF, 2 strany") needs a test.
+
+## 9. Pre-submission audit: the demo form could send the e-mail without JavaScript
+
+**What happened**
+- **The leak.** Since the lead-form commit (`2f28f61`, 2026-10-11), the form had `method="POST" action="/dekujeme.html"`. The `<noscript>` note only told visitors without JavaScript to use a direct PDF link; it did not stop the form being submitted. So with JavaScript disabled, a visitor could type an e-mail, press Enter, and the browser would POST it to `/dekujeme.html`.
+- **The wrong event.** In demo mode a successful submission emitted the production event `lead_success`, although nothing was sent.
+- **Unchanged in its original form since.** The no-JavaScript submission path existed from the MVP onward, and no test covered visitors without JavaScript.
+
+**How it was detected**
+- The owner requested a factual audit on 2026-10-13. Claude found both issues by reading the code (`index.html` form attributes, `assets/app.js` `send()` and the submit handler).
+- The leak was then **verified by a test** run against the previous markup with JavaScript disabled. The local test server received `POST /dekujeme.html` with `email=nojs.visitor%40example.cz` in the body.
+
+**How it was resolved (`6f2a599`, 2026-10-14, after the owner's review and approval)**
+- The form controls sit in `<fieldset id="lead-fields" disabled>`. Without JavaScript nothing can be typed or submitted, and disabled fields are never included in a submission. `assets/app.js` enables the fieldset, so visitors with JavaScript see no change: form screenshots are byte-identical in light and dark.
+- Demo submissions emit `demo_lead_success`. `lead_success` fires only after a live submission that the server answered with 2xx.
+- The README and `docs/project-brief.md` now state that the form is demo-only, no real leads are collected, the PDF is public and not gated, and no analytics provider is connected.
+- 5 new tests (71 in total) cover the no-JS and JS demo paths, the event names and the PDF's public accessibility.
+- No deployment is recorded in the project: there is no Git remote, no deployment folder, and the README status says "not deployed". The history alone cannot show whether a preview was ever shared; the owner confirmed on 2026-10-14 that the site was never shown outside localhost.
+
+**Lesson**
+- "Nothing is sent" has to hold for every path a visitor can take, including no JavaScript. A user-facing note is not a safeguard.
+- A demo state must not reuse production event names, or analytics will count simulated leads once it is switched on.
+- A test suite written alongside the code (36, then 66 tests) missed this, because every form test assumed JavaScript was on.
