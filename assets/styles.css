@@ -139,6 +139,10 @@ sup { font-size: .8125rem; line-height: 0; }
 .btn-primary { background: var(--accent); color: var(--accent-text); }
 .btn-ghost { background: transparent; color: var(--accent); }
 .disclaimer-inline { font-size: .85rem; color: var(--muted); margin-bottom: 0; }
+/* CTA at the end of a section (after the comparison). Full width on phones. */
+.section-cta { margin: var(--space-l) 0 0; }
+.section-cta .btn { width: 100%; }
+@media (min-width: 40rem) { .section-cta .btn { width: auto; } }
 /* Hero teaser: the ad's promise answered with sourced numbers. */
 .hero-teaser {
   margin: var(--space-m) 0 .25rem; padding-left: var(--space-s);

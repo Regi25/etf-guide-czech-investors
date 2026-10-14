@@ -931,6 +931,46 @@ await test('privacy claims hold in the code: no localStorage, cookies or third-p
   }
 });
 
+/* ---------- Tests: CTA after the comparison; hero CTA wording ---------- */
+
+for (const [width, height, mobile] of [[375, 667, true], [1280, 800, false]]) {
+  await test(`compare CTA ${width}x${height}: right after the comparison, before the form; primary style; tracked; lands on the form`, async () => {
+    const p = await openPage('/', { width, height, mobile });
+    const r = await p.eval(`(() => {
+      const a = document.querySelector('#srovnani .section-cta a');
+      if (!a) return null;
+      const after = (x) => !!(x.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const cards = document.querySelectorAll('#srovnani .card');
+      const b = a.getBoundingClientRect(), wrap = a.closest('.wrap'), ws = getComputedStyle(wrap);
+      return {
+        href: a.getAttribute('href'), cls: a.className, track: a.dataset.track, text: a.textContent.trim(),
+        afterCards: after(cards[cards.length - 1]), afterUs: after(document.getElementById('americke-etf')), afterNotes: after(document.querySelector('#srovnani .notes')),
+        beforeForm: !!(a.compareDocumentPosition(document.getElementById('lead-form')) & Node.DOCUMENT_POSITION_FOLLOWING),
+        inComparison: !!a.closest('#srovnani'), h: b.height, w: Math.round(b.width),
+        innerW: Math.round(wrap.clientWidth - parseFloat(ws.paddingLeft) - parseFloat(ws.paddingRight)) };
+    })()`);
+    assert(r, 'CTA after the comparison is missing');
+    assert(r.href === '#tahak' && r.cls === 'btn btn-primary' && r.track === 'compare_cta_click', 'link/style/tracking: ' + JSON.stringify(r));
+    assert(r.inComparison && r.afterCards && r.afterUs && r.afterNotes && r.beforeForm, 'position: ' + JSON.stringify(r));
+    assert(r.h >= 44, 'touch target ' + r.h + 'px');
+    if (mobile) assert(Math.abs(r.w - r.innerW) <= 1, `full width on phones: ${r.w} vs ${r.innerW}`);
+    assert(!/stáhnout/i.test(r.text), 'CTA must not promise a direct download: ' + r.text);
+    await p.eval(`document.documentElement.style.scrollBehavior = 'auto'; document.querySelector('#srovnani .section-cta a').click(); true`);
+    await settle(300);
+    assert((await names(p)).includes('compare_cta_click'), 'compare_cta_click not recorded');
+    const gap = await p.eval(`Math.round(document.getElementById('tahak').getBoundingClientRect().top - document.querySelector('.site-header').getBoundingClientRect().bottom) + 0`);
+    assert(Math.abs(gap) <= 1, 'did not land on the form section, gap ' + gap);
+    await p.close();
+  });
+}
+
+await test('hero CTA: leads to the form and does not promise a direct download', async () => {
+  const p = await openPage('/');
+  const a = await p.eval(`(() => { const a = document.querySelector('.hero .btn-primary'); return { href: a.getAttribute('href'), text: a.textContent.trim() }; })()`);
+  assert(a.href === '#tahak' && a.text === 'Získat tahák zdarma (PDF)', JSON.stringify(a));
+  await p.close();
+});
+
 /* ---------- Tests: production headers ---------- */
 
 await test('csp: every page loads with the production CSP and no console errors', async () => {

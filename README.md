@@ -19,6 +19,14 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
 - **The PDF is not gated.** `assets/tahak-etf.pdf` is a public static file. It can be opened directly by its URL, it is linked from `dekujeme.html`, and its link is already in the landing page's HTML (shown after the demo submission). The form does not control access to it.
 - **No analytics provider is connected.** The GoatCounter tag is commented out. Events stay in the browser (`window.__events`, and the `?debug=1` panel). The only browser storage used is `sessionStorage` for UTM attribution; no cookies and no third-party scripts are loaded.
 
+### Quick start (local, nothing to install except Python 3)
+
+1. In the project folder run `python3 -m http.server 8000`.
+2. Open `http://localhost:8000/`. Ad variants: `?utm_content=ad_a_problem` or `?utm_content=ad_b_compare`. Add `&debug=1` to see the analytics events on the page.
+3. Optional, for the automated tests: `node tests/e2e.mjs`. This needs Node 22+ and Google Chrome; it uses the macOS Chrome path by default, or set `CHROME=/path/to/chrome`.
+
+The form runs in **demo mode**: you can submit it and get the PDF link, but nothing is sent or stored.
+
 | | |
 |---|---|
 | Project brief (summary) | [`docs/project-brief.md`](docs/project-brief.md) |
@@ -45,6 +53,23 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
 - the KID sections as defined by PRIIPs Art. 8(3).
 
 After a (demo) submission, the download link appears at once on the page. The file itself is public and not protected by the form.
+
+## Page structure and section order
+
+The visitor comes from a mobile ad and gives the page a few seconds. The order moves them from the ad's question to the answer, to proof, and only then to the request for an e-mail.
+
+| # | Section | What it does | Why it is here |
+|---|---|---|---|
+| 0 | Sticky header with „Tahák zdarma" | One tap to the form from anywhere on the page | Visitors who are already convinced should not have to scroll back |
+| 1 | **Hero**: headline matched to the ad, one-line **teaser with sourced fees**, CTA „Získat tahák zdarma (PDF)", secondary „Zobrazit srovnání", not-advice line | Answers the ad's promise on the first screen. Variant A: „Místo SPY / VOO: CSPX nebo VUAA… 0,07 %". Variant B: S&P 500 vs global equities with fees. | The value must be visible before any form, and in the first seconds |
+| 2 | **„Proč nekoupím SPY nebo VOO?"** (3 short steps, with sources) | Explains the problem (missing KID under PRIIPs) | Names the frustration from ad A and builds trust before showing alternatives |
+| 3 | **„Srovnání"**: the S&P 500 UCITS cards (CSPX, VUAA), then global equity cards (SWDA, VWCE), then the US ETFs (collapsed), then the footnotes | The answer first, context later. On phones, secondary facts sit behind „Podrobnosti". | The visitor's question is "what can I buy instead?", so the alternatives come before the US originals |
+| 4 | **CTA after the comparison**: „Získat tahák se srovnáním (PDF)" | Leads to the form at the moment the value has been shown | The interactive element (the comparison) leads to the contact; the PDF contains this comparison |
+| 5 | **„Tahák"**: three bullets on what is inside, a preview of page 1, then the one-field form | The contact request | Asked only after the problem and the comparison: the value is clear before the form |
+| 6 | **FAQ** (UCITS, KID, ISIN vs ticker, Acc/Dist, TER, "is this advice?") | Handles objections | For visitors still undecided after the form; it does not delay the ask |
+| 7 | Footer | Full not-advice and risk notice | Required, but not part of the decision path |
+
+This order is a design decision, not a measured result. A/B hypothesis 2 below tests the main alternative (the form earlier).
 
 ## Data and sources
 
@@ -114,6 +139,26 @@ The site, both ads and the PDF share one editorial look:
 
 > Visitors who just hit a broker's refusal to sell a US ETF have a specific, urgent question. A page that answers it neutrally and with verifiable sources, and that offers a reusable checklist for the next step in their broker app, will convert better than a generic "invest in ETFs" page. Matching the headline to the ad's promise further reduces drop-off in the first seconds.
 
+### Expected conversion (hypothesis, not measured)
+
+**Planning range: 4–8 % of landing-page visitors submit their e-mail (midpoint about 6 %).** This is an assumption for planning, not a measured result and not taken from a verified benchmark. The site has never been live, so there is no real data yet.
+
+How the range is built, per 100 visitors from the ad:
+
+| Step | Event | Assumption |
+|---|---|---|
+| Land on the page | `page_view` | 100 |
+| See the comparison | `comparison_view` | 50–60 (mobile visitors leave quickly; the hero teaser already answers part of the question) |
+| Start the form | `form_start` | 10–15 (the PDF is free, specific and previewed; the form has one field) |
+| Submit a valid e-mail | `lead_success` (live) | 4–8 (some drop-off at the e-mail field, typical caution about financial topics) |
+
+Assumptions behind it:
+- **Traffic:** paid social on mobile, from people who are problem-aware (ad A) or comparison-curious (ad B). Ad A is expected to convert at the upper end (A/B hypothesis 1).
+- **Offer:** a free, specific cheat sheet with real numbers, visible before the form; only one required field; no double opt-in.
+- **Risks that would lower it:** an unknown brand, distrust of finance sites, and the PDF being available without the form.
+
+Once real collection and analytics are switched on, these numbers are replaced by measured ones (see [Going live](#going-live)).
+
 Primary metric (once live): **lead rate = `lead_success/<v>` ÷ `page_view/<v>`**, per ad variant `<v>`. Both come from the same `track()` source. In demo mode there are no leads; demo submissions are recorded as `demo_lead_success` and must not be counted as leads.
 
 ## A/B testing hypotheses (prioritised)
@@ -135,7 +180,8 @@ All funnel events, including the landing page view, are recorded by one function
 | Event path | Fires when |
 |---|---|
 | `page_view/<v>` | landing page (`index.html`) loaded; always the first event. Not fired on the thank-you page. |
-| `cta_click/<v>` | hero or header CTA ("Stáhnout tahák zdarma (PDF)", "Tahák zdarma") clicked |
+| `cta_click/<v>` | hero or header CTA ("Získat tahák zdarma (PDF)", "Tahák zdarma") clicked |
+| `compare_cta_click/<v>` | CTA after the comparison ("Získat tahák se srovnáním (PDF)") clicked |
 | `compare_click/<v>` | hero button "Zobrazit srovnání" clicked |
 | `comparison_view/<v>` | the **first UCITS fund's key facts** (annual costs, `#srovnani .card .fact-key`) are at least 50 % visible (once). This small element comes right after the section intro, so the "Zobrazit srovnání" jump reaches it on 320×640 and larger screens. On a 320×568 phone the intro fills the screen after the jump, and the event fires after a short further scroll. |
 | `form_start/<v>` | first focus in the form (once) |
@@ -252,7 +298,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 74 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 77 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -269,6 +315,7 @@ To regenerate the PDF after editing `tahak.html`:
   - **With JavaScript:** the controls are enabled and no request carries the e-mail.
   - **Events:** `demo_lead_success` in demo; `lead_success` only after a live 2xx, and neither after a server error.
   - **PDF:** reachable directly, without the form.
+- **CTAs:** the CTA after the comparison sits after the cards, the US table and the footnotes and before the form; it has the primary style, is full width and at least 44 px tall on phones, is tracked as `compare_cta_click` and lands on the form. The hero CTA leads to the form and does not promise a direct download.
 - **Privacy claims:**
   - the privacy page has no draft markers;
   - in the browser, after a demo submission and visits to every page: no cookies, an empty `localStorage`, only the attribution key in `sessionStorage` (no e-mail, no consent), and no requests to other hosts;
@@ -331,7 +378,7 @@ These are **future** steps. None of them is done; the current behaviour is descr
 ## What was tested, and what was not
 
 Tested locally:
-- 74/74 e2e tests pass.
+- 77/77 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.
@@ -354,9 +401,48 @@ Tested locally:
 - **The PDF is not gated:** it is a public static file (direct URL, linked from `dekujeme.html` and from the no-JS note). The form does not control access. This is acceptable for a free resource, but the form is not an access control.
 - **Data freshness:** fees and fund sizes change. Re-check them against the sources before any real campaign.
 
-## AI usage
+## How AI was used
 
-Built with Claude Code. Session exports created with `/export` are stored in [`ai-log/`](ai-log/) (`*.txt`), unedited except for one documented e-mail redaction (below). [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md) is a separate written summary of decisions and corrections, drafted with Claude and reviewed by the owner. It is not an export.
+**Setup.** The project was built in one Claude Code session (model Claude Opus 5.5), with no sub-agents. The owner gave instructions step by step. The agent worked in stages and stopped for review. Since 2026-10-11 it stops after **every** milestone; passing tests do not count as approval. Commits, the history rewrite and any outward step happen only after the owner's explicit approval.
+
+**What was delegated to the agent**
+- Research and data verification: web search, reading issuer factsheets (PDF text extraction), checking listing venues, fees, dates and fund sizes.
+- Code: HTML, CSS and JavaScript of the page, the form in demo mode, attribution and analytics events, accessibility details.
+- A dependency-free browser test suite (`tests/e2e.mjs`), validators, screenshots.
+- The two ads, the PDF cheat sheet and its preview, the documentation.
+- Audits on request (data, privacy, requirements) and Git operations, including the e-mail history rewrite (with backup and an approved plan).
+
+**What the owner decided or did**
+- Choices: the NYSE Arca interpretation, Netlify and GoatCounter as the plan, demo-only form, the „globální akcie" wording, privacy approach, publishing.
+- Manual checks in the browser, the answer to open questions, account creation, and the `/export` command.
+
+**Instructions the agent worked under** (from the owner's prompts):
+- Do not invent prices, fees, tickers, sources or availability claims; label anything unverified.
+- Never fabricate logs; only genuine `/export` files go into `ai-log/`.
+- No dependencies, no new services, no real data collection until a privacy notice exists.
+- Explain planned changes before risky steps (history rewrite) and stop for approval.
+
+**How the output was checked**
+- **Automated browser tests:** 77 tests run in headless Chrome against a local mock server, for layout at 320–1280 px, form behaviour with and without JavaScript, events, data consistency between page, PDF and ads, and privacy claims.
+- **Mutation runs:** new tests were also run against the previous code to confirm they fail without the change.
+- **Validators and links:** W3C HTML/CSS validators, link checks of all sources.
+- **Screenshots:** reviewed at mobile and desktop widths in light and dark.
+- **Data audit:** against issuer factsheets; the owner independently checked three values.
+- **Owner review:** manual checks after milestones.
+
+**Where the AI was wrong, and how it was fixed** (details in [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md)):
+1. **Data sources.** First data partly came from justETF (secondary) because Vanguard's VOO page did not load. It was replaced by issuer factsheets, and one fee conflict (VWCE 0.19 % vs 0.14 %) was resolved to the issuer's 0.14 %.
+2. **Page copy.** The page said all data was verified with the fund managers, which was not literally true. The wording was corrected, and the exceptions are marked with an asterisk.
+3. **Analytics gaps found by the owner's manual test:** unrecognised `utm_content` values, an untracked button, `comparison_view` not firing, and no `page_view`. 19 passing tests had missed them.
+4. **A false technical claim.** The agent stated that an old visibility check fired at 1px. A mutation test and direct observation showed this was false in Chrome; it was corrected openly.
+5. **Mistakes in its own tests:** a regex escaped wrongly in a template string, `-0` not returned by DevTools, a missing key-event detail. Each was caught by a mutation run or a failing test.
+6. **Visual and document bugs:** a strip of the wrong background under the header after anchor jumps (scroll margin larger than the header), and the PDF growing to 3 pages after a restyle. Both were fixed and are covered by tests.
+7. **Privacy bug found in the pre-submission audit.** Without JavaScript, the demo form could still POST the e-mail. A test against the old markup confirmed it; it was fixed by disabling the controls until JavaScript runs. Demo submissions also emitted the real `lead_success`; they now emit `demo_lead_success`.
+8. **Process.** Early on, the agent completed several milestones in one run. The owner then required a stop after each milestone.
+
+### Session exports
+
+Session exports created with `/export` are stored in [`ai-log/`](ai-log/) (`*.txt`), unedited except for one documented e-mail redaction (below). [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md) is a separate written summary of decisions and corrections, drafted with Claude and reviewed by the owner. It is not an export.
 
 There are two genuine exports of the same Claude Code session. They are **cumulative**: each `/export` contains the whole conversation from its first prompt up to the moment of export.
 
