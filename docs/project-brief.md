@@ -1,6 +1,6 @@
 # ETF Guide for Czech Investors: project brief (summary)
 
-This is a short summary of what the project set out to build, written for this repository. It is not the original brief. Status notes describe the repository as of 2026-10-11.
+This is a short summary of what the project set out to build, written for this repository. It is not the original brief. Status notes describe the repository as of 2026-10-14.
 
 ## Goal
 
@@ -8,7 +8,7 @@ A mobile-first landing page in Czech for retail investors in the Czech Republic 
 
 The page:
 - compares well-known US-listed ETFs with European (UCITS) alternatives;
-- offers a free PDF in exchange for an e-mail address.
+- offers a free PDF cheat sheet. The intended model is to exchange it for an e-mail address; in the current demo the PDF is public and no e-mail is collected (see Status below).
 
 Visitor-facing text is in Czech; code and technical documentation are in English.
 
@@ -16,7 +16,7 @@ Visitor-facing text is in Czech; code and technical documentation are in English
 
 - Two ad variants with different framing: a problem-led ad and a comparison-led ad.
 - Each ad links to the page with its own UTM parameters.
-- The page reads these parameters, shows the headline that matches the ad, and attaches the attribution to every lead.
+- The page reads these parameters and shows the headline that matches the ad. It attaches the attribution to the form data, which in demo mode is never sent, so no lead carries it yet.
 
 ## Comparison content and sources
 
@@ -28,10 +28,13 @@ Visitor-facing text is in Czech; code and technical documentation are in English
 
 ## Lead magnet and form
 
-- A two-page PDF cheat sheet, available for download immediately after the form is submitted.
+- A two-page PDF cheat sheet. After a submission, the page shows the download link at once.
 - Marketing consent is optional and is not a condition for receiving the PDF.
-- **Status: demo mode.**
-  - The form does not store or send any data.
+- **Status: demo mode. No real leads are collected.**
+  - **With JavaScript:** the form validates the e-mail and shows the download link. Nothing is sent or stored.
+  - **Without JavaScript:** the form controls are disabled, so nothing can be submitted.
+  - **The PDF is publicly accessible.** It is a static file at `assets/tahak-etf.pdf`, reachable by its URL and linked from `dekujeme.html`. The form does not control access to it.
+  - Demo submissions are recorded as the browser-side event `demo_lead_success`, never as `lead_success`.
   - The privacy notice is a draft with placeholders.
   - Real lead collection is enabled only after the privacy details are confirmed.
 
@@ -39,7 +42,7 @@ Visitor-facing text is in Czech; code and technical documentation are in English
 
 - Events from the landing page view to the PDF download, each tagged with the ad variant.
 - Cookieless analytics (GoatCounter).
-- **Status:** the analytics script is disabled until a site code is provided. Events can be checked locally with the `?debug=1` panel.
+- **Status:** not connected. The analytics script is disabled until a site code is provided, so events stay in the browser. They can be checked locally with the `?debug=1` panel.
 
 ## Design, testing and deployment
 
