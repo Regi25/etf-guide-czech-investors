@@ -1,5 +1,7 @@
 # Implementation Plan (MVP first)
 
+> **Superseded.** This is the original plan, kept for history. Some of it no longer matches the site. For example, attribution is no longer stored in sessionStorage and GoatCounter's `count.js` is no longer used. For the current approach, see the [README](../README.md), especially "Funnel analytics" and "UTM attribution".
+
 Status: **proposal, awaiting approval**. No code has been written.
 
 Principles:

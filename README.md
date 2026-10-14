@@ -15,9 +15,10 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
   - **Without JavaScript:** all form controls are disabled, so nothing can be typed or submitted.
 
   Real collection stays off until a full privacy notice exists (see [Going live](#going-live)).
-- **Privacy page.** `ochrana-udaju.html` (Czech) describes only this demo's behaviour, and each statement is checked by a test: no e-mail sent or kept; no cookies or `localStorage` set by the site's code; `sessionStorage` used only for attribution; no analytics or third-party scripts. It says explicitly that it does not cover any technical logs of a future hosting provider. It is **not** a privacy notice for real data collection.
+- **Privacy page.** `ochrana-udaju.html` (Czech) describes only this demo's behaviour, and each statement is checked by a test: no e-mail sent or kept; nothing stored on the visitor's device (no cookies, `localStorage`, `sessionStorage` or IndexedDB); measurement switched off, with what GoatCounter would receive once it is switched on; no third-party scripts. Hosting-provider logs are mentioned only in general terms, because they are outside this repository. It states that it is a technical description, not a legal assessment, and it is **not** a privacy notice for real data collection.
 - **The PDF is not gated.** `assets/tahak-etf.pdf` is a public static file. It can be opened directly by its URL, it is linked from `dekujeme.html`, and its link is already in the landing page's HTML (shown after the demo submission). The form does not control access to it.
-- **No analytics provider is connected.** The GoatCounter tag is commented out. Events stay in the browser (`window.__events`, and the `?debug=1` panel). The only browser storage used is `sessionStorage` for UTM attribution; no cookies and no third-party scripts are loaded.
+- **Analytics is inactive.** The GoatCounter endpoint (`<meta name="goatcounter-endpoint" content="">`) is empty, so no request is made. Events stay in the page (`window.__events`, and the `?debug=1` panel). See [Funnel analytics](#funnel-analytics).
+- **Nothing is stored on the visitor's device.** UTM attribution is read from the current URL on each page load and kept in memory only. No cookies, `localStorage`, `sessionStorage` or IndexedDB, and no third-party scripts.
 
 ### Quick start (local, nothing to install except Python 3)
 
@@ -96,7 +97,7 @@ Deliberate content rules:
 - **Trust before the ask:** the PRIIPs explanation and the sourced comparison come before the form. Sources sit directly under each card.
 - **System fonts, no third-party assets.** This keeps the page fast and avoids sending visitor data to font CDNs.
 - **Light and dark themes** follow the system setting. All text/background pairs pass WCAG AA contrast (≥4.5:1, computed).
-- **Strict CSP** (`netlify.toml`): only the site itself and GoatCounter are allowed. There are no inline scripts or styles.
+- **Strict CSP** (`netlify.toml`): scripts, styles, fonts and requests come only from the site itself. The single exception is `img-src https://*.goatcounter.com` for the analytics pixel. There are no inline scripts or styles.
 
 ## Visual identity
 
@@ -173,7 +174,28 @@ Run one test at a time and decide on a pre-registered sample size; at demo-scale
 
 ## Funnel analytics
 
-**Status: not connected.** The GoatCounter tag is commented out in `index.html` and `dekujeme.html`, so events are only recorded in the browser. The plan is GoatCounter (cookieless; its docs say it "probably doesn't require a GDPR consent notice"). It records `utm_campaign` and `utm_source` natively. **The ad variant travels in the event name** because GoatCounter doesn't record `utm_content`.
+**Status: inactive.** `assets/app.js` contains a GoatCounter integration that stays off until a real endpoint is configured. Until then, events are only recorded in the page (`window.__events`, `?debug=1`). No request is made, and no third-party script exists in the code.
+
+### How it works when switched on
+
+The page uses GoatCounter's documented **tracking pixel** (`/count?p=…`) from its own script. It does not use GoatCounter's `count.js`, which by default sends the full path including the query string and relies on the `Referer` header. `app.js` sends a hit only when **both** conditions hold:
+- `<meta name="goatcounter-endpoint">` in `index.html` / `dekujeme.html` matches `https://<code>.goatcounter.com/count` exactly, and `<code>` is not a placeholder (`your-code`, `example`, …);
+- the page is not on a local address (`file:`, `localhost`, `127.*`, `[::1]`, `0.0.0.0`).
+
+Each hit is an image request with `referrerPolicy = "no-referrer"` and exactly these parameters:
+
+| Parameter | Pageview | Event |
+|---|---|---|
+| `p` | the page path **without the query string**, e.g. `/` or `/dekujeme.html` | `<event>/<variant>`, e.g. `cta_click/a` |
+| `t` | the page's fixed `<title>` | the event name |
+| `e` | (not sent) | `true` |
+| `rnd` | random cache-buster | random cache-buster |
+
+Never sent: the e-mail or any form value, UTM values, `gclid`/`fbclid`, the full URL or the referrer. Only names on the fixed list in `app.js` (`EVENTS`, the table below) are tracked; any other `data-track` value is ignored. The variant is always `a`, `b` or `default`, derived from `utm_content` but never the URL value itself. The tests check all of this against intercepted requests on a non-local test host.
+
+GoatCounter **does not receive the campaign or source** (UTM), on purpose. Campaign-level reporting comes from the ad platform. The variant, which is what the A/B test needs, travels in the event name.
+
+### Events
 
 All funnel events, including the landing page view, are recorded by one function, `track()` in `assets/app.js`. The funnel therefore has a single source and always starts with `page_view`.
 
@@ -192,24 +214,49 @@ All funnel events, including the landing page view, are recorded by one function
 | `magnet_download/<v>` | PDF link clicked (success panel or thank-you page) |
 | `source_click/<v>` | a fund's source link clicked |
 
-`<v>` is `a`, `b` or `default`. It is derived from `utm_content`, but it is **not** a URL value itself.
+`<v>` is `a`, `b` or `default`. On `dekujeme.html` it is always `default`, because attribution is not carried between pages.
 
-GoatCounter's own automatic pageview (from `count.js`) still runs. It shows the total traffic per URL and the campaign, but not the variant. Use `page_view/<v>` for funnel maths.
+In addition, every page load sends one plain pageview (path only, no variant). It shows total traffic per page. Use `page_view/<v>` for funnel maths.
 
 **Debug panel:** add `debug=1` to the URL, e.g. `/?utm_content=ad_a_problem&debug=1`. A box in the bottom-right corner then:
 - shows which variant applied and why, e.g. "variant: default (utm_content=a, not recognised: use ad_a_problem or ad_b_compare)";
+- shows the analytics state: `active (<code>.goatcounter.com)`, `inactive (no endpoint configured)` or `inactive (local address)`;
 - lists every event as it fires, starting with `page_view`.
 
 Elements without a `data-track` attribute (FAQ items, body text) record nothing when clicked.
 
+### What the aggregate counts can and cannot show
+
+GoatCounter stores **counts per path per period**, not visitor records. Its "visitors" figure de-duplicates repeat hits from the same browser within about 8 hours (matched in memory on GoatCounter's side, not on the device).
+
+They **can** show:
+- how often each event happened per variant and per day, e.g. `cta_click/a` vs `cta_click/b`;
+- approximate step ratios per variant, e.g. `form_submit/b ÷ page_view/b`, and once live, the headline conversion `lead_success/<v> ÷ page_view/<v>`;
+- whether a step is badly broken: a step that suddenly drops to zero, or a ratio far outside the expected range.
+
+They **cannot** show:
+- a single visitor's path, the order of their steps, or where an individual dropped off. The funnel is built from totals per step, so a visitor may be counted at a later step without having been counted at an earlier one (e.g. a direct visit to `#tahak`);
+- time to convert, or which CTA a particular person clicked before submitting;
+- campaign, source, ad set or creative beyond the variant `a`/`b`/`default` (those come from the ad platform);
+- exact numbers. Ad blockers and privacy tools block the pixel, so all counts are undercounts, and possibly unequally by variant or device. Bots may be counted. A visitor who returns after the 8-hour window is counted again;
+- real leads while the form is in demo mode: `demo_lead_success` only means the download link was shown.
+
+Small numbers will not separate the variants. For example, telling a 6 % lead rate from 4 % needs roughly 1,900 `page_view`s per variant (two-sided test, 5 % significance, 80 % power; see [Conversion hypothesis](#conversion-hypothesis)). Until then, differences between `a` and `b` are noise.
+
+### Switching it on (owner)
+
+1. Create a site at goatcounter.com (free for reasonable public use; see its terms). Note the code, e.g. `mysite`.
+2. In the GoatCounter dashboard (*Settings*), **switch off** the optional data collection: browsers, operating systems, locations (country/region), languages and screen sizes. Leave the collection of individual pageviews **off** (the default). Check the exact labels in the dashboard; they may differ from these names.
+3. In `index.html` **and** `dekujeme.html`, set `<meta name="goatcounter-endpoint" content="https://mysite.goatcounter.com/count">`. Nothing else changes; the CSP already allows the pixel.
+4. Update `ochrana-udaju.html`: change „měření vypnuté" to say it is switched on, and match the description to the dashboard settings actually chosen. Update the test that checks this text.
+5. Deploy, open `/?utm_content=ad_a_problem&debug=1` on the live URL, check that the panel says `active`, click a CTA, and confirm `page_view/a` and `cta_click/a` appear in the dashboard.
+
 ### UTM attribution
 
-On landing, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `gclid` and `fbclid` are stored in `sessionStorage`:
-- The first touch of the session wins, but a campaign visit replaces an earlier direct visit.
+On each page load, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `gclid` and `fbclid` are read from the **current URL** and kept in the page's memory only:
+- Nothing is written to the device, so nothing carries over to the next page load. A visitor who reloads the page without the parameters, or opens it again later, sees the default headline.
 - Values are capped at 200 characters.
-- They are sent with the lead as hidden fields, together with `landing_variant`, `landing_url` and `referrer`.
-
-Every Netlify submission (and its CSV export) therefore carries its ad.
+- In live mode, they are sent with the lead as hidden form fields (to Netlify Forms, not to analytics), together with `landing_variant`, `landing_url` and `referrer`. Every Netlify submission (and its CSV export) therefore carries its ad.
 
 ### Ad variants and links
 
@@ -298,7 +345,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 77 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 82 browser tests (CHROME=/path/to/chrome to override; ONLY=<regex> runs a subset)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -308,7 +355,7 @@ To regenerate the PDF after editing `tahak.html`:
   --print-to-pdf=assets/tahak-etf.pdf "file://$PWD/tahak.html"
 ```
 
-`tests/e2e.mjs` starts a local server that mimics Netlify Forms and sends the production CSP. It then drives headless Chrome over the DevTools protocol. It covers:
+`tests/e2e.mjs` starts a local server that mimics Netlify Forms and sends the production CSP. It then drives headless Chrome over the DevTools protocol. Chrome maps the test host `etf.test` to the local server and fails to resolve every other unknown name; every request to `*.goatcounter.com` is intercepted and answered locally, so the tests never reach GoatCounter. It covers:
 - **Form:** validation, demo mode (nothing sent), live mode against the mock endpoint (lead POSTed, server error handled), honeypot.
 - **Demo safety:**
   - **Without JavaScript:** the controls are disabled. Clicking, typing, Enter and clicking submit send no request that could carry the e-mail, and the page does not navigate.
@@ -317,18 +364,22 @@ To regenerate the PDF after editing `tahak.html`:
   - **PDF:** reachable directly, without the form.
 - **CTAs:** the CTA after the comparison sits after the cards, the US table and the footnotes and before the form; it has the primary style, is full width and at least 44 px tall on phones, is tracked as `compare_cta_click` and lands on the form. The hero CTA leads to the form and does not promise a direct download.
 - **Privacy claims:**
-  - the privacy page has no draft markers;
-  - in the browser, after a demo submission and visits to every page: no cookies, an empty `localStorage`, only the attribution key in `sessionStorage` (no e-mail, no consent), and no requests to other hosts;
-  - in the code: no storage or cookie APIs and no third-party script tags in any site file.
-- **UTM:** both variants, persistence across navigation, first-touch rule, length cap. Short values like `a`/`b` fall back to the default headline.
+  - the privacy page has no draft markers and contains the statements on device storage, measurement (switched off), hosting and scope;
+  - in the browser, after a demo submission and visits to every page: no cookies, and empty `localStorage`, `sessionStorage` and IndexedDB; no requests to other hosts;
+  - in the code: no cookie or storage APIs (`localStorage`, `sessionStorage`, IndexedDB, Cache Storage) and no third-party script tags in any site file.
+- **UTM:** both variants; attribution comes only from the current URL and does not carry over to the next load; length cap. Short values like `a`/`b` fall back to the default headline.
 - **Analytics:**
   - full funnel order starting with `page_view`, with variant tags;
   - `page_view` only on the landing page;
   - "Zobrazit srovnání" fires `compare_click` and then `comparison_view` at 1280×800, 390×844, 375×667, 360×640 and 320×640;
   - at 320×568 the jump alone does not fire `comparison_view`, but a short further scroll does;
   - no `comparison_view` on load or on a small peek;
-  - events queued until GoatCounter loads, and no errors without it.
-- **Debug panel:** shows `page_view` on load, explains an unrecognised `utm_content`, and renders the URL value as text, never as HTML.
+  - **inactive:** no analytics request with an empty, placeholder, `http:`, look-alike-host or extra-query endpoint, even on a public host; none on `127.0.0.1` or `localhost` even with a valid endpoint;
+  - **active** (public test host, valid endpoint): the exact hit sequence; only `p`, `t`, `e`, `rnd`; pageview paths without the query string; event paths are approved names with `/a`, `/b` or `/default`; no `Referer` header; no e-mail, form value, UTM value, click ID or host name in any hit; an unapproved `data-track` name is ignored;
+  - every `data-track` name in the site is on the approved list.
+
+  Mutation check (2026-10-14): these tests fail on the previous `app.js` (`sessionStorage`, `count.js` hook) and on each of eight deliberate breakages: query string in the pageview path, referrer policy removed, `127.*` not treated as local, unknown names allowed, e-mail added to a hit, placeholder endpoint accepted, a `localStorage` write, the campaign added to the event path.
+- **Debug panel:** shows `page_view` on load, explains an unrecognised `utm_content`, shows the analytics state, and renders the URL value as text, never as HTML.
 - **Mobile layout:**
   - the US table shows every field without horizontal scrolling at 320, 360 and 390px;
   - it keeps its table layout at 768 and 1280px;
@@ -368,17 +419,17 @@ These are **future** steps. None of them is done; the current behaviour is descr
 2. In `index.html`, on `<form id="lead-form">`: add `data-netlify="true"` and change `data-lead-mode="demo"` to `"live"`. The demo notices then hide automatically, and `lead_success` starts firing for accepted submissions.
 3. Decide on visitors without JavaScript. The controls are wrapped in `<fieldset id="lead-fields" disabled>`, so without JavaScript nothing can be submitted. To accept native (no-JS) submissions in live mode, remove the `disabled` attribute. Netlify would then receive the POST and show `dekujeme.html`.
 4. Netlify → *Forms*: enable form detection and redeploy. Check that the form `lead` appears. Optionally add an e-mail notification.
-5. GoatCounter: create a site. In `index.html` and `dekujeme.html`, replace `YOUR_CODE` and uncomment the `goatcounter-script` tag.
+5. GoatCounter (optional, independent of the form): follow [Switching it on](#switching-it-on-owner), including the dashboard settings and the privacy-page update.
 6. Remove `<meta name="robots" content="noindex">` if the page should be indexed.
 7. Smoke test on the live URL with both ad links:
    - submit a test lead and check that its UTM fields appear in Netlify Forms;
    - download the PDF;
-   - open `?debug=1` and confirm the events appear in GoatCounter.
+   - open `?debug=1`, check that the panel says `analytics: active`, and confirm the events appear in GoatCounter.
 
 ## What was tested, and what was not
 
 Tested locally:
-- 77/77 e2e tests pass.
+- 82/82 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.
@@ -388,7 +439,7 @@ Tested locally:
 
 **Not tested:**
 - **The real Netlify deployment and Netlify Forms.** Only a local mock of its endpoint was tested.
-- **Real GoatCounter ingestion.** Only a stand-in `count()` was tested. Production verification is step 6 of *Going live*.
+- **Real GoatCounter ingestion.** The requests were checked as sent by Chrome, but they were answered by the test, not by GoatCounter. Production verification is the last step of [Switching it on](#switching-it-on-owner).
 - **Real devices** (iOS Safari, Android Chrome). Mobile was emulated in desktop Chrome.
 - **Lighthouse.** Not run, because the CLI would require installing a dependency. It can be run from Chrome DevTools.
 - **Native-speaker review of the Czech copy.**
@@ -423,7 +474,7 @@ Tested locally:
 - Explain planned changes before risky steps (history rewrite) and stop for approval.
 
 **How the output was checked**
-- **Automated browser tests:** 77 tests run in headless Chrome against a local mock server, for layout at 320–1280 px, form behaviour with and without JavaScript, events, data consistency between page, PDF and ads, and privacy claims.
+- **Automated browser tests:** 82 tests run in headless Chrome against a local mock server, for layout at 320–1280 px, form behaviour with and without JavaScript, events, data consistency between page, PDF and ads, and privacy claims.
 - **Mutation runs:** new tests were also run against the previous code to confirm they fail without the change.
 - **Validators and links:** W3C HTML/CSS validators, link checks of all sources.
 - **Screenshots:** reviewed at mobile and desktop widths in light and dark.
