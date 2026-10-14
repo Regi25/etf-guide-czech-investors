@@ -356,13 +356,19 @@ Tested locally:
 
 ## AI usage
 
-Built with Claude Code. Session exports created with `/export` are stored unedited in [`ai-log/`](ai-log/) (`*.txt`). [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md) is a separate written summary of decisions and corrections, drafted with Claude and reviewed by the owner. It is not an export.
+Built with Claude Code. Session exports created with `/export` are stored in [`ai-log/`](ai-log/) (`*.txt`), unedited except for one documented e-mail redaction (below). [`ai-log/DECISIONS.md`](ai-log/DECISIONS.md) is a separate written summary of decisions and corrections, drafted with Claude and reviewed by the owner. It is not an export.
 
 There are two genuine exports of the same Claude Code session. They are **cumulative**: each `/export` contains the whole conversation from its first prompt up to the moment of export.
 
 | File | Covers | Note |
 |---|---|---|
 | `2026-10-11-research-and-mvp.txt` | Session start through the MVP summary (11:30 on 2026-10-11) | First export |
-| `2026-10-11-m1-to-m5.txt` | Session start through the Meta ad-copy commit (exported 2026-10-11, 15:26) | Includes everything in the first export, then M1–M5. The name refers to the part it adds. |
+| `2026-10-11-m1-to-m5.txt` | Session start through the Meta ad-copy commit (exported 2026-10-11, 15:26) | Includes everything in the first export, then M1–M5. The name refers to the part it adds. **One redaction:** see below. |
 
-Neither file was edited, trimmed or merged; the overlap is kept as exported. Work after the second export is not in any export yet: the pre-submission audit and the demo-form safety fix, recorded in Git history. A later `/export` under a new filename would add it without overwriting either file.
+Neither file was trimmed or merged, and the overlap is kept as exported.
+
+**One redaction in the second export.** Line 2899 of `2026-10-11-m1-to-m5.txt` quoted the author's personal e-mail address. On 2026-10-14, before publication, that address was replaced with `[e-mail redacted]`. Nothing else in either export was changed. The original, unredacted file is kept privately by the owner.
+- SHA-256 of the original: `3e2da4118634dda743f03ad25eba6660ef61ae345ef1036c03105923eb835406`
+- SHA-256 of the published file: `cf470977cc26b9baaa071ec1414fd423ef5a87cf43a971e9c887df00bd3b2c30`
+
+**Commit hashes inside the exports are the old ones.** The same rewrite replaced the personal e-mail in all commit metadata with a GitHub noreply address, which changed every commit hash. The exports were not edited to follow, so they cite pre-rewrite hashes; [`docs/commit-hash-map.md`](docs/commit-hash-map.md) maps each old hash to the new one. Work after the second export is not in any export yet: the pre-submission audit and the demo-form safety fix, recorded in Git history. A later `/export` under a new filename would add it without overwriting either file.
