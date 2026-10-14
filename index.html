@@ -250,15 +250,18 @@
         </div>
         <!--
           Lead form. DEMO MODE: no data-netlify attribute, so Netlify registers
-          no form and stores nothing. To go live (only after the privacy page
-          is completed), see README "Going live": add data-netlify="true" and
-          set data-lead-mode="live".
+          no form and stores nothing. The controls sit in a fieldset that is
+          disabled in the HTML: without JavaScript nothing can be typed or
+          submitted, so no e-mail can leave the browser. assets/app.js enables
+          it. To go live (only after the privacy page is completed), see README
+          "Going live".
         -->
         <form id="lead-form" class="lead-form" name="lead" method="POST" action="/dekujeme.html"
               data-lead-mode="demo" netlify-honeypot="company" novalidate>
           <p class="demo-banner" data-demo-only>
             <strong>Ukázkový režim:</strong> formulář zatím neukládá ani neodesílá žádné údaje. Tahák získáte hned po odeslání.
           </p>
+          <fieldset class="lead-fields" id="lead-fields" disabled>
           <input type="hidden" name="form-name" value="lead">
           <p class="hp" aria-hidden="true">
             <label>Nevyplňujte <input name="company" tabindex="-1" autocomplete="off"></label>
@@ -289,6 +292,7 @@
           <input type="hidden" name="time_to_submit_ms">
 
           <button class="btn btn-primary btn-block" type="submit">Získat tahák (PDF)</button>
+          </fieldset>
           <p class="form-error" id="form-error" role="alert" hidden>Odeslání se nepovedlo. Zkontrolujte připojení a&nbsp;zkuste to prosím znovu.</p>
           <p class="form-note">Zpracování údajů: <a href="ochrana-udaju.html">informace o&nbsp;ochraně osobních údajů</a> (koncept).</p>
           <noscript><p class="form-note">Bez JavaScriptu formulář v&nbsp;ukázkovém režimu nefunguje. <a href="dekujeme.html">Tahák najdete zde.</a></p></noscript>

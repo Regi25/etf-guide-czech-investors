@@ -187,6 +187,11 @@
   var submitBtn = form.querySelector('button[type="submit"]');
   var mode = form.getAttribute('data-lead-mode') === 'live' ? 'live' : 'demo';
 
+  // The controls are disabled in the HTML so that nothing can be submitted
+  // without JavaScript (demo safety). Enable them now that the script runs.
+  var fields = document.getElementById('lead-fields');
+  if (fields) fields.disabled = false;
+
   // Demo notices are only shown while the form is not collecting data.
   if (mode === 'live') {
     document.querySelectorAll('[data-demo-only]').forEach(function (el) { el.hidden = true; });
@@ -259,7 +264,9 @@
 
     send(new URLSearchParams(new FormData(form)))
       .then(function () {
-        track('lead_success');
+        // lead_success is reserved for a live submission the server accepted.
+        // In demo mode nothing was sent, so record a clearly separate event.
+        track(mode === 'live' ? 'lead_success' : 'demo_lead_success');
         showSuccess();
       })
       .catch(function () {

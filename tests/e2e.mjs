@@ -22,13 +22,16 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
 const CSP = (await readFile(join(ROOT, 'netlify.toml'), 'utf8')).match(/Content-Security-Policy = "([^"]+)"/)[1];
 
 const posts = [];
+const requests = []; // every request: { method, url, body }
 let failPosts = false;
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  let reqBody = '';
+  if (req.method !== 'GET' && req.method !== 'HEAD') for await (const chunk of req) reqBody += chunk;
+  requests.push({ method: req.method, url: req.url, body: reqBody });
   if (req.method === 'POST' && url.pathname === '/') {
-    let body = '';
-    for await (const chunk of req) body += chunk;
+    const body = reqBody;
     posts.push(Object.fromEntries(new URLSearchParams(body)));
     res.writeHead(failPosts ? 500 : 200).end();
     return;
@@ -83,7 +86,7 @@ const cdp = (method, params = {}, sessionId) => new Promise((resolve, reject) =>
   ws.send(JSON.stringify({ id, method, params, sessionId }));
 });
 
-async function openPage(path, { width = 390, height = 844, mobile = true } = {}) {
+async function openPage(path, { width = 390, height = 844, mobile = true, js = true } = {}) {
   const { targetId } = await cdp('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true });
   await cdp('Page.enable', {}, sessionId);
@@ -95,6 +98,7 @@ async function openPage(path, { width = 390, height = 844, mobile = true } = {})
     if (m.sessionId === sessionId && m.method === 'Log.entryAdded' && m.params.entry.level === 'error') errors.push(m.params.entry.text);
   });
   await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile }, sessionId);
+  if (!js) await cdp('Emulation.setScriptExecutionDisabled', { value: true }, sessionId);
   const goto = async (p) => {
     const loaded = new Promise((r) => {
       const fn = (m) => { if (m.sessionId === sessionId && m.method === 'Page.loadEventFired') { listeners.splice(listeners.indexOf(fn), 1); r(); } };
@@ -322,7 +326,7 @@ await test('analytics: full funnel fires events in order, tagged with the varian
   await p.eval(`document.querySelector('#lead-success [data-track="magnet_download"]').click(); true`);
 
   const names = await p.eval(`window.__events.map(e => e.name)`);
-  const expected = ['page_view', 'cta_click', 'comparison_view', 'form_start', 'form_submit', 'lead_success', 'magnet_download'];
+  const expected = ['page_view', 'cta_click', 'comparison_view', 'form_start', 'form_submit', 'demo_lead_success', 'magnet_download'];
   assert(JSON.stringify(names) === JSON.stringify(expected), 'order: ' + names.join(','));
   const paths = await p.eval(`window.__events.map(e => e.path)`);
   assert(paths.every((x) => x.endsWith('/a') && !x.startsWith('/')), 'paths: ' + paths.join(','));
@@ -802,6 +806,83 @@ await test('PDF file: exactly 2 pages; every source URL from tahak.html is a cli
   const expected = new Set([...html.matchAll(/<a href="(https:\/\/[^"]+)"/g)].map((m) => m[1]));
   assert(expected.size === 13, 'expected 13 source links in tahak.html, got ' + expected.size);
   for (const u of expected) assert(uris.has(noSlash(u)), 'not a link in the PDF: ' + u);
+});
+
+/* ---------- Tests: demo-mode safety and event accuracy ---------- */
+
+const EMAIL = 'nojs.visitor@example.cz';
+const leaked = () => requests.filter((r) => r.method !== 'GET' || decodeURIComponent(r.url).includes('@') || r.body.includes('example.cz') || r.body.includes('%40'));
+
+await test('no JavaScript (demo): controls disabled; typing, Enter and clicking submit send nothing; no navigation', async () => {
+  const before = requests.length;
+  const p = await openPage('/', { width: 375, height: 667, js: false });
+  assert((await p.eval(`document.getElementById('lead-fields').disabled`)) === true, 'fieldset should be disabled without JS');
+  assert((await p.eval(`document.getElementById('email').matches(':disabled') && document.querySelector('#lead-form button[type=submit]').matches(':disabled')`)), 'email and submit must be disabled');
+  // Try what a visitor would do: click the e-mail field, type, press Enter, click the button.
+  await p.eval(`document.documentElement.style.scrollBehavior = 'auto'; document.getElementById('email').scrollIntoView({ block: 'center' }); true`);
+  const center = async (sel) => p.eval(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+  const click = async (sel) => { const c = await center(sel); for (const type of ['mousePressed', 'mouseReleased']) await p.cdp('Input.dispatchMouseEvent', { type, x: c.x, y: c.y, button: 'left', clickCount: 1 }); };
+  await click('#email');
+  await p.cdp('Input.insertText', { text: EMAIL });
+  await p.cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+  await p.cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await p.eval(`document.querySelector('#lead-form button[type=submit]').scrollIntoView({ block: 'center' }); true`);
+  await click('#lead-form button[type=submit]');
+  await settle(800);
+  const bad = leaked().filter((r) => requests.indexOf(r) >= before);
+  assert(bad.length === 0, 'requests that could carry the e-mail: ' + JSON.stringify(bad));
+  assert((await p.eval(`location.pathname`)) === '/', 'page navigated: ' + (await p.eval(`location.href`)));
+  assert((await p.eval(`document.getElementById('email')?.value`)) === '', 'text reached the disabled e-mail field');
+  // The no-JS note offers the PDF directly.
+  assert((await p.eval(`document.querySelector('#lead-form noscript') !== null`)), 'noscript note missing');
+  await p.close();
+});
+
+await test('with JavaScript (demo): controls enabled on load; submit shows the PDF; no request carries the e-mail', async () => {
+  const before = requests.length;
+  const p = await openPage('/');
+  assert((await p.eval(`document.getElementById('lead-fields').disabled`)) === false, 'app.js should enable the fieldset');
+  await p.eval(fillAndSubmit(EMAIL));
+  await p.waitFor(isVisible('#lead-success'));
+  const bad = leaked().filter((r) => requests.indexOf(r) >= before);
+  assert(bad.length === 0, 'requests that could carry the e-mail: ' + JSON.stringify(bad));
+  await p.close();
+});
+
+await test('events: a demo submission emits demo_lead_success and never lead_success', async () => {
+  const p = await openPage(AD_A);
+  await p.eval(fillAndSubmit('jana@example.cz'));
+  await p.waitFor(isVisible('#lead-success'));
+  const names = await p.eval(`window.__events.map(e => e.path)`);
+  assert(names.includes('demo_lead_success/a') && !names.some((n) => n.startsWith('lead_success')), 'events: ' + names);
+  await p.close();
+});
+
+await test('events: live (mock Netlify) emits lead_success only after a 2xx response, never demo_lead_success', async () => {
+  const p = await openPage(AD_B + '&__live=1');
+  await p.eval(fillAndSubmit('petr@example.cz'));
+  await p.waitFor(isVisible('#lead-success'));
+  const names = await p.eval(`window.__events.map(e => e.path)`);
+  assert(names.includes('lead_success/b') && !names.some((n) => n.startsWith('demo_lead_success')), 'events: ' + names);
+  await p.close();
+  failPosts = true;
+  const q = await openPage(AD_B + '&__live=1');
+  await q.eval(fillAndSubmit('eva@example.cz'));
+  await q.waitFor(isVisible('#form-error'));
+  const failed = await q.eval(`window.__events.map(e => e.name)`);
+  assert(!failed.includes('lead_success') && !failed.includes('demo_lead_success') && failed.includes('form_error'), 'events after 500: ' + failed);
+  failPosts = false;
+  await q.close();
+});
+
+await test('PDF: publicly accessible without the form (direct URL, link in the page HTML and on dekujeme.html)', async () => {
+  const pdf = await fetch(BASE + '/assets/tahak-etf.pdf'); // no cookies, no form, no prior visit
+  assert(pdf.ok && pdf.headers.get('content-type') === 'application/pdf', 'PDF not directly reachable');
+  const index = await (await fetch(BASE + '/')).text();
+  assert(index.includes('href="assets/tahak-etf.pdf"'), 'landing HTML should contain the PDF link (shown after submit)');
+  const thanks = await (await fetch(BASE + '/dekujeme.html')).text();
+  assert(thanks.includes('href="assets/tahak-etf.pdf"'), 'dekujeme.html should link the PDF');
+  assert(index.includes('<a href="dekujeme.html">'), 'the no-JS note should link dekujeme.html');
 });
 
 /* ---------- Tests: production headers ---------- */

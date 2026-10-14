@@ -2,11 +2,21 @@
 
 US ETFs vs. European alternatives. On the site itself (Czech UI) the brand is **ETF tahák** ("ETF cheat sheet").
 
-A mobile-first, conversion-focused landing page for Czech retail investors arriving from a mobile ad. It explains why US-listed ETFs (SPY, IVV, VOO, all on **NYSE Arca**) are usually not available to EU retail investors. It compares four verified European UCITS alternatives, and offers a free PDF cheat sheet in exchange for an e-mail address.
+A mobile-first, conversion-focused landing page for Czech retail investors arriving from a mobile ad. It explains why US-listed ETFs (SPY, IVV, VOO, all on **NYSE Arca**) are usually not available to EU retail investors. It compares four verified European UCITS alternatives and offers a free PDF cheat sheet. The page shows an e-mail form before the download link, but the form runs in demo mode and the PDF itself is a public file (see [Current status](#current-status)).
 
 - Customer-facing copy is in Czech. Code and docs are in English.
 - Static HTML/CSS/vanilla JS with no build step and no dependencies.
-- **Status: demo, not deployed.** The lead form runs in **demo mode** and stores nothing until the privacy details are confirmed (see [Going live](#going-live)).
+- **Status: demo, not deployed.** See [Current status](#current-status).
+
+### Current status
+
+- **The form runs in demo mode.** Nothing is sent or stored, and no real leads are collected.
+  - **With JavaScript:** a valid submission only shows the download link. The entered data stays in the page's memory (`window.__lastLeadPayload`) until the tab closes.
+  - **Without JavaScript:** all form controls are disabled, so nothing can be typed or submitted.
+
+  Real collection stays off until the privacy details are confirmed (see [Going live](#going-live)).
+- **The PDF is not gated.** `assets/tahak-etf.pdf` is a public static file. It can be opened directly by its URL, it is linked from `dekujeme.html`, and its link is already in the landing page's HTML (shown after the demo submission). The form does not control access to it.
+- **No analytics provider is connected.** The GoatCounter tag is commented out. Events stay in the browser (`window.__events`, and the `?debug=1` panel). The only browser storage used is `sessionStorage` for UTM attribution; no cookies and no third-party scripts are loaded.
 
 | | |
 |---|---|
@@ -33,7 +43,7 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
 - a 7-step checklist for buying an ETF in a broker app,
 - the KID sections as defined by PRIIPs Art. 8(3).
 
-It is delivered **immediately** on the page after submit.
+After a (demo) submission, the download link appears at once on the page. The file itself is public and not protected by the form.
 
 ## Data and sources
 
@@ -95,7 +105,7 @@ The site, both ads and the PDF share one editorial look:
 - **Teaser above the fold:** below the subheadline, a one-line answer to the ad's promise with sourced fees: A (and default) „Místo SPY / VOO: CSPX nebo VUAA — stejný index S&P 500, roční náklady 0,07 %", B „S&P 500 (jen USA): CSPX a VUAA, 0,07 % ročně. Globální akcie: SWDA (rozvinuté trhy) 0,20 %, VWCE (vč. rozvíjejících se) 0,14 % ročně". A source line links to the comparison. A test checks that every fee in the teaser equals the fee shown in that fund's card.
 - **CTA above the fold** on a 390px phone, repeated in the sticky header ("Tahák zdarma").
 - **Short form:** e-mail only (required). The unused first-name field was removed. **Marketing consent is a separate, optional, unchecked box**; the PDF is given either way.
-- **Immediate delivery:** after submit the form is replaced by a download button. There is no e-mail round-trip and no double opt-in wait.
+- **Immediate delivery:** after submit the form is replaced by a download button. There is no e-mail round-trip and no double opt-in wait. No e-mail is sent at all, and the PDF is a public file, not gated by the form.
 - **Friction-free errors:** a Czech inline validation message, and on a network error the typed values are kept.
 - **Spam:** Netlify honeypot plus a recorded `time_to_submit_ms` for later filtering. Nothing is blocked on timing, which avoids false positives. No CAPTCHA.
 
@@ -103,7 +113,7 @@ The site, both ads and the PDF share one editorial look:
 
 > Visitors who just hit a broker's refusal to sell a US ETF have a specific, urgent question. A page that answers it neutrally and with verifiable sources, and that offers a reusable checklist for the next step in their broker app, will convert better than a generic "invest in ETFs" page. Matching the headline to the ad's promise further reduces drop-off in the first seconds.
 
-Primary metric: **lead rate = `lead_success/<v>` ÷ `page_view/<v>`**, per ad variant `<v>`. Both come from the same `track()` source.
+Primary metric (once live): **lead rate = `lead_success/<v>` ÷ `page_view/<v>`**, per ad variant `<v>`. Both come from the same `track()` source. In demo mode there are no leads; demo submissions are recorded as `demo_lead_success` and must not be counted as leads.
 
 ## A/B testing hypotheses (prioritised)
 
@@ -117,7 +127,7 @@ Run one test at a time and decide on a pre-registered sample size; at demo-scale
 
 ## Funnel analytics
 
-GoatCounter (cookieless; its docs say it "probably doesn't require a GDPR consent notice"). It records `utm_campaign` and `utm_source` natively. **The ad variant travels in the event name** because GoatCounter doesn't record `utm_content`.
+**Status: not connected.** The GoatCounter tag is commented out in `index.html` and `dekujeme.html`, so events are only recorded in the browser. The plan is GoatCounter (cookieless; its docs say it "probably doesn't require a GDPR consent notice"). It records `utm_campaign` and `utm_source` natively. **The ad variant travels in the event name** because GoatCounter doesn't record `utm_content`.
 
 All funnel events, including the landing page view, are recorded by one function, `track()` in `assets/app.js`. The funnel therefore has a single source and always starts with `page_view`.
 
@@ -129,7 +139,8 @@ All funnel events, including the landing page view, are recorded by one function
 | `comparison_view/<v>` | the **first UCITS fund's key facts** (annual costs, `#srovnani .card .fact-key`) are at least 50 % visible (once). This small element comes right after the section intro, so the "Zobrazit srovnání" jump reaches it on 320×640 and larger screens. On a 320×568 phone the intro fills the screen after the jump, and the event fires after a short further scroll. |
 | `form_start/<v>` | first focus in the form (once) |
 | `form_submit/<v>` | submit with valid input |
-| `lead_success/<v>` | lead accepted (Netlify 2xx; in demo mode: simulated) |
+| `lead_success/<v>` | **live mode only:** the lead was submitted and the server answered 2xx. Never fired in demo mode. |
+| `demo_lead_success/<v>` | **demo mode only:** the form passed validation and the download link was shown. Nothing was sent; this is not a lead. |
 | `form_error/<v>` | network or server error |
 | `magnet_download/<v>` | PDF link clicked (success panel or thank-you page) |
 | `source_click/<v>` | a fund's source link clicked |
@@ -196,7 +207,7 @@ The copy uses the same facts and wording as the image and the matching landing v
 | CTA button | **Learn more** (Czech UI label: „Další informace") | — |
 
 Notes:
-- **Why "Learn more":** both ads lead to the comparison, and the PDF needs an e-mail address. "Download" would promise an instant file the click does not deliver.
+- **Why "Learn more":** both ads lead to the comparison page, not straight to the file. The download link appears after the (demo) form on that page, so "Download" would promise something the click itself does not deliver.
 - **To check in Ads Manager before launch:**
   - the exact Czech CTA label;
   - Meta's current length guidance (commonly about 125 / 40 / 30 characters for primary text / headline / description);
@@ -240,7 +251,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 66 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 71 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -252,6 +263,11 @@ To regenerate the PDF after editing `tahak.html`:
 
 `tests/e2e.mjs` starts a local server that mimics Netlify Forms and sends the production CSP. It then drives headless Chrome over the DevTools protocol. It covers:
 - **Form:** validation, demo mode (nothing sent), live mode against the mock endpoint (lead POSTed, server error handled), honeypot.
+- **Demo safety:**
+  - **Without JavaScript:** the controls are disabled. Clicking, typing, Enter and clicking submit send no request that could carry the e-mail, and the page does not navigate.
+  - **With JavaScript:** the controls are enabled and no request carries the e-mail.
+  - **Events:** `demo_lead_success` in demo; `lead_success` only after a live 2xx, and neither after a server error.
+  - **PDF:** reachable directly, without the form.
 - **UTM:** both variants, persistence across navigation, first-touch rule, length cap. Short values like `a`/`b` fall back to the default headline.
 - **Analytics:**
   - full funnel order starting with `page_view`, with variant tags;
@@ -297,11 +313,12 @@ The owner creates the accounts; nothing has been deployed yet.
 Do this only after the privacy details are confirmed.
 
 1. Complete `ochrana-udaju.html`: fill every `[DOPLNIT]` (controller, purposes and legal bases, retention, processors, rights), have it reviewed, and remove the "KONCEPT" banner.
-2. In `index.html`, on `<form id="lead-form">`: add `data-netlify="true"` and change `data-lead-mode="demo"` to `"live"`. The demo notices then hide automatically.
-3. Netlify → *Forms*: enable form detection and redeploy. Check that the form `lead` appears. Optionally add an e-mail notification.
-4. GoatCounter: create a site. In `index.html` and `dekujeme.html`, replace `YOUR_CODE` and uncomment the `goatcounter-script` tag.
-5. Remove `<meta name="robots" content="noindex">` if the page should be indexed.
-6. Smoke test on the live URL with both ad links:
+2. In `index.html`, on `<form id="lead-form">`: add `data-netlify="true"` and change `data-lead-mode="demo"` to `"live"`. The demo notices then hide automatically, and `lead_success` starts firing for accepted submissions.
+3. Decide on visitors without JavaScript. The controls are wrapped in `<fieldset id="lead-fields" disabled>`, so without JavaScript nothing can be submitted. To accept native (no-JS) submissions in live mode, remove the `disabled` attribute. Netlify would then receive the POST and show `dekujeme.html`.
+4. Netlify → *Forms*: enable form detection and redeploy. Check that the form `lead` appears. Optionally add an e-mail notification.
+5. GoatCounter: create a site. In `index.html` and `dekujeme.html`, replace `YOUR_CODE` and uncomment the `goatcounter-script` tag.
+6. Remove `<meta name="robots" content="noindex">` if the page should be indexed.
+7. Smoke test on the live URL with both ad links:
    - submit a test lead and check that its UTM fields appear in Netlify Forms;
    - download the PDF;
    - open `?debug=1` and confirm the events appear in GoatCounter.
@@ -309,7 +326,7 @@ Do this only after the privacy details are confirmed.
 ## What was tested, and what was not
 
 Tested locally:
-- 66/66 e2e tests pass.
+- 71/71 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.
@@ -329,7 +346,7 @@ Tested locally:
 - **Collapsible sections and JavaScript:** „Podrobnosti" and „Americké ETF pro srovnání" are native `<details>` elements. They open and close without JavaScript on every screen size, with mouse, touch or keyboard. Only their automatic opening from 768px (48rem) needs `assets/app.js`. Without JavaScript, desktop visitors see them collapsed and can open them with one click.
 - **Headline variant swap:** the default headline can flash briefly before `app.js` swaps in A/B, because the script is deferred. Server-side or edge rendering would remove this.
 - **No e-mail delivery:** the PDF is downloaded on the page. Leads are only stored (once live), not e-mailed.
-- **The PDF is not truly gated:** it is a static file. This is acceptable for a free resource.
+- **The PDF is not gated:** it is a public static file (direct URL, linked from `dekujeme.html` and from the no-JS note). The form does not control access. This is acceptable for a free resource, but the form is not an access control.
 - **Data freshness:** fees and fund sizes change. Re-check them against the sources before any real campaign.
 
 ## AI usage

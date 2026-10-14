@@ -283,6 +283,8 @@ sup { font-size: .8125rem; line-height: 0; }
   max-width: 32rem;
 }
 .lead-success:focus { outline: none; }
+/* Groups the form controls (disabled until app.js runs); no visual box. */
+.lead-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
 .demo-banner {
   background: var(--warn-soft); border: 1px solid var(--warn-border);
   border-radius: 8px; padding: .6rem .75rem; font-size: .88rem;
@@ -303,7 +305,8 @@ sup { font-size: .8125rem; line-height: 0; }
 .field-error, .form-error { color: var(--error); font-size: .9rem; margin: .35rem 0 0; }
 .form-note { font-size: .85rem; color: var(--muted); margin: .75rem 0 0; }
 .btn-block { width: 100%; }
-.btn[disabled] { opacity: .6; cursor: progress; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn[aria-busy="true"] { cursor: progress; }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
 /* Keep anchor targets clear of the sticky header */
