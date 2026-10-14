@@ -43,6 +43,11 @@ const server = createServer(async (req, res) => {
     if (path.endsWith('.html') && url.searchParams.has('__live')) {
       data = Buffer.from(data.toString().replace('data-lead-mode="demo"', 'data-lead-mode="live" data-netlify="true"'));
     }
+    // Test-only switch: ?__gc=<value> fills the GoatCounter endpoint meta (empty in the real files).
+    if (path.endsWith('.html') && url.searchParams.has('__gc')) {
+      const value = url.searchParams.get('__gc').replace(/[&"<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+      data = Buffer.from(data.toString().replace('<meta name="goatcounter-endpoint" content="">', `<meta name="goatcounter-endpoint" content="${value}">`));
+    }
     res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream', 'Content-Security-Policy': CSP }).end(data);
   } catch {
     res.writeHead(404).end('not found');
@@ -50,11 +55,17 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}`;
+// The same server under a non-local name, so analytics can switch on. Chrome maps
+// etf.test to 127.0.0.1; every other unknown name fails to resolve, so a test can
+// never reach the real GoatCounter (its requests are intercepted below anyway).
+const PUBLIC_BASE = `http://etf.test:${server.address().port}`;
+const LOCALHOST_BASE = `http://localhost:${server.address().port}`;
 
 /* ---------- Minimal CDP client ---------- */
 
 const profile = await mkdtemp(join(tmpdir(), 'e2e-chrome-'));
-const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  '--host-resolver-rules=MAP etf.test 127.0.0.1,MAP * ~NOTFOUND,EXCLUDE 127.0.0.1,EXCLUDE localhost', '--disable-features=HttpsUpgrades', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
 const wsUrl = await new Promise((resolve, reject) => {
   let buf = '';
   chrome.stderr.on('data', (d) => {
@@ -86,12 +97,24 @@ const cdp = (method, params = {}, sessionId) => new Promise((resolve, reject) =>
   ws.send(JSON.stringify({ id, method, params, sessionId }));
 });
 
-async function openPage(path, { width = 390, height = 844, mobile = true, js = true } = {}) {
+// base: BASE (127.0.0.1), PUBLIC_BASE (etf.test) or LOCALHOST_BASE.
+// Every request to *.goatcounter.com is intercepted, recorded in page.hits
+// ({ url, params, headers }) and answered locally with an empty 204.
+async function openPage(path, { width = 390, height = 844, mobile = true, js = true, base = BASE } = {}) {
   const { targetId } = await cdp('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true });
   await cdp('Page.enable', {}, sessionId);
   await cdp('Runtime.enable', {}, sessionId);
   await cdp('Network.enable', {}, sessionId);
+  const hits = [];
+  await cdp('Fetch.enable', { patterns: [{ urlPattern: '*://*goatcounter.com/*' }] }, sessionId);
+  listeners.push((m) => {
+    if (m.sessionId !== sessionId || m.method !== 'Fetch.requestPaused') return;
+    const u = new URL(m.params.request.url);
+    if (!/(^|\.)goatcounter\.com$/.test(u.hostname)) { cdp('Fetch.continueRequest', { requestId: m.params.requestId }, sessionId).catch(() => {}); return; }
+    hits.push({ url: u.href, host: u.host, path: u.pathname, params: [...u.searchParams], headers: m.params.request.headers });
+    cdp('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 204 }, sessionId).catch(() => {});
+  });
   const urlsRequested = [];
   listeners.push((m) => { if (m.sessionId === sessionId && m.method === 'Network.requestWillBeSent') urlsRequested.push(m.params.request.url); });
   await cdp('Log.enable', {}, sessionId);
@@ -103,17 +126,20 @@ async function openPage(path, { width = 390, height = 844, mobile = true, js = t
   await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile }, sessionId);
   if (!js) await cdp('Emulation.setScriptExecutionDisabled', { value: true }, sessionId);
   const goto = async (p) => {
-    const loaded = new Promise((r) => {
-      const fn = (m) => { if (m.sessionId === sessionId && m.method === 'Page.loadEventFired') { listeners.splice(listeners.indexOf(fn), 1); r(); } };
+    let fn;
+    const loaded = new Promise((r, reject) => {
+      fn = (m) => { if (m.sessionId === sessionId && m.method === 'Page.loadEventFired') { listeners.splice(listeners.indexOf(fn), 1); r(); } };
       listeners.push(fn);
+      setTimeout(() => { if (listeners.includes(fn)) { listeners.splice(listeners.indexOf(fn), 1); reject(new Error('page did not load: ' + base + p)); } }, 15000);
     });
-    await cdp('Page.navigate', { url: BASE + p }, sessionId);
+    await cdp('Page.navigate', { url: base + p }, sessionId);
     await loaded;
   };
   await goto(path);
   const page = {
-    goto, // same tab, so sessionStorage is kept
+    goto, // same tab
     errors,
+    hits,
     urlsRequested,
     cdp: (method, params = {}) => cdp(method, params, sessionId),
 
@@ -138,7 +164,10 @@ async function openPage(path, { width = 390, height = 844, mobile = true, js = t
 /* ---------- Test harness ---------- */
 
 const results = [];
+// ONLY=<regex> runs just the matching tests.
+const ONLY = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
 async function test(name, fn) {
+  if (ONLY && !ONLY.test(name)) return;
   try {
     await fn();
     results.push(['PASS', name]);
@@ -274,22 +303,22 @@ await test('utm: no parameters keeps default headline and empty attribution', as
   await p.close();
 });
 
-await test('utm: attribution survives reload and navigation without parameters', async () => {
+await test('utm: attribution comes only from the current URL; nothing carries over to the next page load', async () => {
   const p = await openPage(AD_B);
   await p.goto('/dekujeme.html');
   await p.goto('/');
-  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'b', 'variant lost after navigation');
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'default', 'variant carried over without parameters');
   const d = await submitAndGetPayload(p);
-  assert(d.utm_content === 'ad_b_compare' && d.utm_source === 'meta', 'attribution lost: ' + JSON.stringify(d));
+  assert(d.utm_content === '' && d.utm_source === '' && d.landing_variant === 'default', 'attribution carried over: ' + JSON.stringify(d));
   await p.close();
 });
 
-await test('utm: first campaign touch wins; campaign replaces a direct visit', async () => {
-  const p = await openPage('/');
-  await p.goto(AD_A);
+await test('utm: each ad link applies its own variant in the same tab (no first-touch memory)', async () => {
+  const p = await openPage(AD_A);
   await p.goto(AD_B);
+  assert((await p.eval(`document.getElementById('hero-title').dataset.variant`)) === 'b', 'second ad link should show B');
   const d = await submitAndGetPayload(p);
-  assert(d.utm_content === 'ad_a_problem', 'expected first campaign (A), got ' + d.utm_content);
+  assert(d.utm_content === 'ad_b_compare' && d.landing_variant === 'b', 'expected the current link (B), got ' + JSON.stringify(d));
   await p.close();
 });
 
@@ -313,8 +342,8 @@ await test('live (mock Netlify): attribution reaches the submitted lead', async 
 
 /* ---------- Tests: analytics events ---------- */
 
-// Stand-in for GoatCounter's count.js: records every count() call.
-const FAKE_GC = `window.__gcCalls = []; window.goatcounter = { count: (v) => window.__gcCalls.push(v) }; true`;
+// A syntactically valid endpoint for tests. Requests to it are intercepted by openPage.
+const GC = 'https://demo-test.goatcounter.com/count';
 // Stop real navigation/download on link clicks after our handlers have run.
 const BLOCK_NAV = `window.addEventListener('click', (e) => { if (e.target.closest('a')) e.preventDefault(); }); true`;
 
@@ -324,7 +353,6 @@ await test('analytics: full funnel fires events in order, tagged with the varian
   await p.eval(`document.querySelector('.hero [data-track="cta_click"]').click(); true`);
   await p.eval(`document.querySelector('#srovnani .cards').scrollIntoView(); true`);
   await p.waitFor(`window.__events.some(e => e.name === 'comparison_view')`);
-  await p.eval(FAKE_GC); // GoatCounter "loads" mid-session: earlier events must be flushed
   await p.eval(`document.getElementById('email').focus(); true`);
   await p.eval(fillAndSubmit('jana@example.cz'));
   await p.waitFor(isVisible('#lead-success'));
@@ -335,8 +363,7 @@ await test('analytics: full funnel fires events in order, tagged with the varian
   assert(JSON.stringify(names) === JSON.stringify(expected), 'order: ' + names.join(','));
   const paths = await p.eval(`window.__events.map(e => e.path)`);
   assert(paths.every((x) => x.endsWith('/a') && !x.startsWith('/')), 'paths: ' + paths.join(','));
-  const calls = await p.eval('window.__gcCalls');
-  assert(calls.length === expected.length && calls.every((c) => c.event === true), 'GoatCounter calls: ' + JSON.stringify(calls));
+  assert(p.hits.length === 0, 'no endpoint configured, yet analytics requests were made: ' + JSON.stringify(p.hits));
   assert((await p.eval(`document.querySelectorAll('.debug-panel li').length`)) === expected.length, 'debug panel incomplete');
   assert(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
   await p.close();
@@ -364,7 +391,7 @@ await test('analytics: server error fires form_error, not lead_success', async (
   await p.close();
 });
 
-await test('analytics: no GoatCounter loaded is harmless; source clicks and thank-you download tracked', async () => {
+await test('analytics: inactive analytics is harmless; source clicks and thank-you download tracked', async () => {
   const p = await openPage('/');
   await p.eval(BLOCK_NAV);
   await p.eval(`document.querySelector('[data-track="source_click"]').click(); true`);
@@ -452,8 +479,10 @@ await test('debug: panel shows page_view on load and explains an unrecognised ut
   assert((await p.eval(`[...document.querySelectorAll('.debug-panel li')].map(li => li.textContent).join()`)) === 'page_view/default', 'panel rows');
   const info = await p.eval(`document.querySelector('.debug-panel p').textContent`);
   assert(info.includes('variant: default') && info.includes('not recognised') && info.includes('ad_a_problem'), 'info: ' + info);
-  await p.goto('/?utm_content=ad_a_problem&debug=1'); // same session: first touch 'a' is kept
-  assert((await p.eval(`document.querySelector('.debug-panel p').textContent`)).includes('utm_content=a,'), 'first touch should still be shown');
+  assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: inactive (no endpoint configured)'), 'analytics state missing');
+  await p.goto('/?utm_content=ad_a_problem&debug=1'); // same tab: only the current URL counts
+  const now = await p.eval(`document.querySelector('.debug-panel p').textContent`);
+  assert(now.includes('variant: a (utm_content=ad_a_problem)'), 'current link should be shown: ' + now);
   await p.close();
 });
 
@@ -895,12 +924,13 @@ await test('PDF: publicly accessible without the form (direct URL, link in the p
 await test('privacy page: no draft banner or placeholders; describes the demo', async () => {
   const html = await (await fetch(BASE + '/ochrana-udaju.html')).text();
   assert(!/DOPLNIT|KONCEPT|koncept/.test(html), 'draft markers left on the privacy page');
-  for (const m of ['ukázkovém režimu', 'Nikam se neodesílá', 'nenastavuje žádné cookies', 'sessionStorage', 'skripty třetích stran', 'Co tento popis nepokrývá'])
+  for (const m of ['ukázkovém režimu', 'Nikam se neodesílá', 'Co stránka ukládá ve vašem zařízení', 'nepoužívá cookies, localStorage, sessionStorage ani IndexedDB',
+    'skripty třetích stran', 'měření vypnuté', 'Neposílá e-mail, obsah formuláře, parametry UTM ani odkazující stránku', 'Hosting', 'ne právní posouzení'])
     assert(html.includes(m), 'privacy page lacks: ' + m);
   for (const f of ['/', '/dekujeme.html']) assert(!/\(koncept\)/.test(await (await fetch(BASE + f)).text()), f + ' still labels the privacy page as draft');
 });
 
-await test('privacy claims hold in the browser: no cookies, no localStorage, sessionStorage only attribution (no e-mail), no third-party requests', async () => {
+await test('privacy claims hold in the browser: no cookies, localStorage, sessionStorage or IndexedDB; no third-party requests', async () => {
   const p = await openPage(AD_A + '&fbclid=test123');
   await p.eval(`document.getElementById('marketing_consent').checked = true; true`);
   await p.eval(fillAndSubmit('privacy.check@example.cz', { consent: true }));
@@ -908,10 +938,8 @@ await test('privacy claims hold in the browser: no cookies, no localStorage, ses
   for (const path of ['/dekujeme.html', '/ochrana-udaju.html', '/404.html', '/tahak.html', '/']) await p.goto(path);
   const { cookies } = await p.cdp('Network.getAllCookies');
   assert(cookies.length === 0, 'cookies present: ' + JSON.stringify(cookies.map((c) => c.name)));
-  const st = await p.eval(`({ local: localStorage.length, keys: Object.keys(sessionStorage), dump: JSON.stringify(sessionStorage) })`);
-  assert(st.local === 0, 'localStorage used');
-  assert(st.keys.join() === 'etf_attribution_v1', 'unexpected sessionStorage keys: ' + st.keys.join());
-  assert(!st.dump.includes('privacy.check') && !st.dump.includes('marketing_consent'), 'e-mail or consent in sessionStorage');
+  const st = await p.eval(`(async () => ({ local: localStorage.length, session: sessionStorage.length, idb: (await indexedDB.databases()).map((d) => d.name) }))()`);
+  assert(st.local === 0 && st.session === 0 && st.idb.length === 0, 'device storage used: ' + JSON.stringify(st));
   const kept = await p.eval(`JSON.stringify(window.__lastLeadPayload || {})`);
   assert(!kept.includes('privacy.check') && !kept.includes('marketing_consent'), 'demo payload kept personal fields: ' + kept);
   const foreign = p.urlsRequested.filter((u) => !u.startsWith(BASE) && !u.startsWith('data:'));
@@ -919,14 +947,15 @@ await test('privacy claims hold in the browser: no cookies, no localStorage, ses
   await p.close();
 });
 
-await test('privacy claims hold in the code: no localStorage, cookies or third-party script tags in site files', async () => {
+await test('privacy claims hold in the code: no cookies, localStorage, sessionStorage, IndexedDB or third-party script tags in site files', async () => {
   const files = ['index.html', 'dekujeme.html', 'ochrana-udaju.html', '404.html', 'tahak.html', 'assets/app.js'];
   for (const f of files) {
     const src = await (await fetch(BASE + '/' + f)).text();
     const active = src.replace(/<!--[\s\S]*?-->/g, ''); // commented-out tags are not loaded
     // Storage APIs only matter in code: app.js and any inline <script> (page text may mention the words).
-    const code = f.endsWith('.js') ? active : [...active.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n');
-    assert(!/localStorage|document\.cookie|indexedDB/.test(code), f + ' uses persistent storage or cookies');
+    const scripts = f.endsWith('.js') ? active : [...active.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n');
+    const code = scripts.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''); // comments may name the APIs they avoid
+    assert(!/localStorage|sessionStorage|document\.cookie|indexedDB|cookieStore|caches\.open/i.test(code), f + ' uses device storage or cookies');
     assert(!/<script[^>]+src="https?:/i.test(active), f + ' loads a third-party script');
   }
 });
@@ -969,6 +998,112 @@ await test('hero CTA: leads to the form and does not promise a direct download',
   const a = await p.eval(`(() => { const a = document.querySelector('.hero .btn-primary'); return { href: a.getAttribute('href'), text: a.textContent.trim() }; })()`);
   assert(a.href === '#tahak' && a.text === 'Získat tahák zdarma (PDF)', JSON.stringify(a));
   await p.close();
+});
+
+/* ---------- Tests: GoatCounter pixel (inactive by default; privacy of what is sent) ---------- */
+
+const APPROVED = ['page_view', 'cta_click', 'compare_click', 'compare_cta_click', 'comparison_view', 'form_start', 'form_submit',
+  'demo_lead_success', 'lead_success', 'form_error', 'magnet_download', 'source_click'];
+// Every value a hit carries must be on this short list; anything else fails the test.
+const checkHits = (hits, banned) => {
+  for (const h of hits) {
+    assert(h.host === 'demo-test.goatcounter.com' && h.path === '/count', 'unexpected target: ' + h.url);
+    const keys = h.params.map(([k]) => k).sort().join();
+    const q = Object.fromEntries(h.params);
+    assert(keys === 'p,rnd,t' || keys === 'e,p,rnd,t', 'unexpected parameters: ' + keys);
+    assert(!Object.keys(h.headers).some((k) => k.toLowerCase() === 'referer'), 'Referer header sent: ' + h.url);
+    assert(/^[a-z0-9]{1,10}$/.test(q.rnd), 'rnd: ' + q.rnd);
+    if (q.e) {
+      const m = q.p.match(/^([a-z_]+)\/(a|b|default)$/);
+      assert(q.e === 'true' && m && APPROVED.includes(m[1]) && q.t === m[1], 'event hit: ' + h.url);
+    } else {
+      assert(/^\/[a-z0-9._/-]*$/i.test(q.p) && !q.p.includes('?'), 'pageview path: ' + q.p);
+    }
+    const raw = decodeURIComponent(h.url);
+    for (const b of banned) assert(!raw.includes(b), `hit carries "${b}": ${h.url}`);
+  }
+};
+
+await test('analytics inactive: no request without a real endpoint (empty, placeholders, wrong host or scheme), even on a public host', async () => {
+  for (const gc of [null, 'https://YOUR_CODE.goatcounter.com/count', 'https://your-code.goatcounter.com/count', 'https://<your-code>.goatcounter.com/count',
+    'http://demo-test.goatcounter.com/count', 'https://demo-test.goatcounter.com.evil.test/count', 'https://evil.test/count', 'https://demo-test.goatcounter.com/count?x=1']) {
+    const p = await openPage(AD_A + '&debug=1' + (gc === null ? '' : '&__gc=' + encodeURIComponent(gc)), { base: PUBLIC_BASE });
+    await p.eval(BLOCK_NAV);
+    await p.eval(`document.querySelector('.hero [data-track="cta_click"]').click(); true`);
+    await p.eval(fillAndSubmit('jana@example.cz'));
+    await p.waitFor(isVisible('#lead-success'));
+    await settle(200);
+    assert((await p.eval('location.hostname')) === 'etf.test', 'setup: not on the public test host');
+    assert(p.hits.length === 0, `endpoint ${gc}: analytics requests made: ` + p.hits.map((h) => h.url).join(' '));
+    const other = p.urlsRequested.filter((u) => !u.startsWith(PUBLIC_BASE) && !u.startsWith('data:'));
+    assert(other.length === 0, `endpoint ${gc}: other hosts requested: ` + other.join(' '));
+    const state = await p.eval(`document.querySelector('.debug-panel').textContent`);
+    assert(state.includes('analytics: inactive (no endpoint configured)'), `endpoint ${gc}: debug state: ` + state);
+    await p.close();
+  }
+});
+
+await test('analytics inactive on local addresses (127.0.0.1, localhost) even with a real endpoint', async () => {
+  for (const base of [BASE, LOCALHOST_BASE]) {
+    const p = await openPage(AD_A + '&debug=1&__gc=' + encodeURIComponent(GC), { base });
+    await p.eval(fillAndSubmit('jana@example.cz'));
+    await p.waitFor(isVisible('#lead-success'));
+    await settle(200);
+    assert((await p.eval(`document.querySelector('meta[name="goatcounter-endpoint"]').content`)) === GC, 'setup: endpoint not injected');
+    assert(p.hits.length === 0, base + ': analytics requests made: ' + p.hits.map((h) => h.url).join(' '));
+    assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: inactive (local address)'), base + ': debug state');
+    await p.close();
+  }
+});
+
+await test('analytics active (public host + real endpoint): pixel only; approved events with variant; no e-mail, form values, UTM, query or referrer', async () => {
+  const UTM = AD_A.replace('fbclid=abc123', 'fbclid=FBCLIDVALUE') + '&utm_term=TERMVALUE&debug=1';
+  const p = await openPage(UTM + '&__gc=' + encodeURIComponent(GC), { base: PUBLIC_BASE });
+  await p.eval(BLOCK_NAV);
+  assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: active (demo-test.goatcounter.com)'), 'debug state');
+  await p.eval(`document.querySelector('.hero [data-track="cta_click"]').click(); true`);
+  await p.eval(`document.querySelector('#srovnani .section-cta a').click(); true`);
+  await p.eval(`document.querySelector('[data-track="source_click"]').click(); true`);
+  // An element with an unapproved name must be ignored.
+  await p.eval(`(() => { const b = document.createElement('button'); b.dataset.track = 'secret_jana@example.cz'; b.id = 'rogue'; document.body.append(b); b.click(); return true; })()`);
+  await p.eval(`document.getElementById('email').focus(); true`);
+  await p.eval(fillAndSubmit('jana.analytics@example.cz', { consent: true }));
+  await p.waitFor(isVisible('#lead-success'));
+  await settle(300);
+  const hitNames = p.hits.map((h) => Object.fromEntries(h.params).p);
+  const expected = ['/', 'page_view/a', 'cta_click/a', 'compare_cta_click/a', 'source_click/a', 'form_start/a', 'form_submit/a', 'demo_lead_success/a'];
+  // comparison_view may fire once, whenever the comparison scrolls into view; its timing varies.
+  assert(hitNames.filter((n) => n === 'comparison_view/a').length <= 1, 'comparison_view sent more than once');
+  assert(JSON.stringify(hitNames.filter((n) => n !== 'comparison_view/a')) === JSON.stringify(expected), 'hits: ' + hitNames.join(','));
+  const pv = Object.fromEntries(p.hits[0].params);
+  assert(pv.t === (await p.eval('document.title')), 'pageview title should be the fixed page title: ' + pv.t);
+  checkHits(p.hits, ['@', 'example.cz', 'jana', 'meta', 'paid_social', 'etf_cz_2026q4', 'ad_a_problem', 'FBCLIDVALUE', 'TERMVALUE', 'utm_', 'fbclid', '__gc', 'debug', 'secret', 'consent', 'etf.test']);
+  assert(!(await p.eval(`window.__events.map(e => e.name).join()`)).includes('secret'), 'unapproved event recorded');
+  const foreign = p.urlsRequested.filter((u) => !u.startsWith(PUBLIC_BASE) && !u.startsWith('data:') && !u.startsWith(GC + '?'));
+  assert(foreign.length === 0, 'requests to other hosts: ' + foreign.join(' '));
+  assert(p.errors.length === 0, 'page errors (CSP?): ' + p.errors.join(' | '));
+  await p.close();
+});
+
+await test('analytics active: thank-you page sends its path without the query string and magnet_download with a variant suffix', async () => {
+  const p = await openPage('/dekujeme.html?utm_source=meta&email=x%40example.cz&__gc=' + encodeURIComponent(GC), { base: PUBLIC_BASE });
+  await p.eval(BLOCK_NAV);
+  await p.eval(`document.querySelector('[data-track="magnet_download"]').click(); true`);
+  await settle(300);
+  const ps = p.hits.map((h) => Object.fromEntries(h.params).p);
+  assert(JSON.stringify(ps) === JSON.stringify(['/dekujeme.html', 'magnet_download/default']), 'hits: ' + ps.join(','));
+  checkHits(p.hits, ['@', 'example.cz', 'meta', 'utm_', 'email']);
+  await p.close();
+});
+
+await test('analytics: every data-track name in the site is on the approved list (and on the list in app.js)', async () => {
+  const js = await (await fetch(BASE + '/assets/app.js')).text();
+  const list = JSON.parse(js.match(/var EVENTS = (\[[\s\S]*?\]);/)[1].replace(/'/g, '"'));
+  assert(JSON.stringify(list) === JSON.stringify(APPROVED), 'app.js list differs from the test list: ' + list.join());
+  for (const f of ['index.html', 'dekujeme.html', 'ochrana-udaju.html', '404.html']) {
+    const html = await (await fetch(BASE + '/' + f)).text();
+    for (const [, n] of html.matchAll(/data-track="([^"]*)"/g)) assert(APPROVED.includes(n), `${f}: unapproved data-track "${n}"`);
+  }
 });
 
 /* ---------- Tests: production headers ---------- */

@@ -7,17 +7,12 @@
 
   var pageLoadedAt = Date.now();
 
-  /* ---------- Attribution (first touch per browser session) ---------- */
+  /* ---------- Attribution (from the current URL; kept in memory only) ---------- */
 
+  // Read on every page load and never written to the visitor's device (no
+  // cookies, localStorage, sessionStorage or IndexedDB). It is used to pick
+  // the headline variant and to fill the form's hidden fields.
   var ATTR_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid'];
-  var STORE_KEY = 'etf_attribution_v1';
-
-  function readStored() {
-    try { return JSON.parse(sessionStorage.getItem(STORE_KEY)); } catch (e) { return null; }
-  }
-  function store(value) {
-    try { sessionStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch (e) { /* storage blocked: URL values still apply */ }
-  }
 
   var query = new URLSearchParams(window.location.search);
   var fromUrl = {};
@@ -25,19 +20,12 @@
     var value = query.get(key);
     if (value) fromUrl[key] = value.slice(0, 200);
   });
-  var hasUrlParams = Object.keys(fromUrl).length > 0;
 
-  // Keep the first touch of the session, but let a campaign visit replace a
-  // stored direct (parameter-less) visit.
-  var attribution = readStored();
-  if (!attribution || (hasUrlParams && Object.keys(attribution.params || {}).length === 0)) {
-    attribution = {
-      params: fromUrl,
-      landing_url: window.location.href.slice(0, 500),
-      referrer: document.referrer.slice(0, 500)
-    };
-    store(attribution);
-  }
+  var attribution = {
+    params: fromUrl,
+    landing_url: window.location.href.slice(0, 500),
+    referrer: document.referrer.slice(0, 500)
+  };
 
   /* ---------- Headline variant matched to the ad (utm_content) ---------- */
 
@@ -84,14 +72,48 @@
   openOnWide();
   if (wideQuery && wideQuery.addEventListener) wideQuery.addEventListener('change', openOnWide);
 
-  /* ---------- Analytics (GoatCounter, cookieless) ---------- */
+  /* ---------- Analytics (GoatCounter pixel; inactive unless configured) ---------- */
 
-  // Event path = "<event>/<variant>", e.g. "lead_success/a". GoatCounter
-  // records utm_campaign and utm_source itself, but not utm_content, so the
-  // ad variant travels in the event name.
+  // Events are always recorded in the page (window.__events, ?debug=1 panel).
+  // They are sent to GoatCounter only when <meta name="goatcounter-endpoint">
+  // holds a real https://<code>.goatcounter.com/count URL and the page is not
+  // on a local address. The documented GoatCounter pixel is used, so no
+  // third-party script is loaded. Each request carries only:
+  //   p   "<event>/<variant>" (approved names, variant a|b|default), or the
+  //       page path without its query string for a pageview
+  //   t   the event name, or a fixed page title
+  //   e   "true" for events
+  //   rnd cache buster
+  // Never form values, e-mail, UTM values or the referrer.
+  var EVENTS = ['page_view', 'cta_click', 'compare_click', 'compare_cta_click', 'comparison_view',
+    'form_start', 'form_submit', 'demo_lead_success', 'lead_success', 'form_error',
+    'magnet_download', 'source_click'];
+  var ENDPOINT_PATTERN = /^https:\/\/[a-z0-9-]+\.goatcounter\.com\/count$/;
+  // Example codes from the docs and the HTML comment are never a real site.
+  var PLACEHOLDER_CODES = ['your-code', 'yourcode', 'your-site', 'example', 'code'];
+
+  var endpointMeta = document.querySelector('meta[name="goatcounter-endpoint"]');
+  var endpoint = endpointMeta ? (endpointMeta.getAttribute('content') || '').trim() : '';
+  var host = window.location.hostname;
+  var isLocal = window.location.protocol === 'file:' || host === '' || host === 'localhost' ||
+    /^127\./.test(host) || host === '[::1]' || host === '0.0.0.0';
+  var endpointValid = ENDPOINT_PATTERN.test(endpoint) &&
+    PLACEHOLDER_CODES.indexOf(endpoint.split('/')[2].split('.')[0]) === -1;
+  var analyticsActive = endpointValid && !isLocal;
+  var analyticsState = analyticsActive ? 'active (' + endpoint.split('/')[2] + ')'
+    : !endpointValid ? 'inactive (no endpoint configured)'
+    : 'inactive (local address)';
+
+  function sendHit(params) {
+    if (!analyticsActive) return;
+    var img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    params.rnd = Math.random().toString(36).slice(2, 10);
+    img.src = endpoint + '?' + new URLSearchParams(params).toString();
+  }
+
   var debug = query.get('debug') === '1';
   var events = window.__events = [];
-  var pendingCounts = [];
   var debugList = null;
 
   if (debug) {
@@ -107,31 +129,23 @@
       ? ' (utm_content=' + utmContent + (variant ? ')' : ', not recognised: use ad_a_problem or ad_b_compare)')
       : ' (no utm_content)');
     debugList = document.createElement('ol');
+    var state = document.createElement('p');
+    state.textContent = 'analytics: ' + analyticsState;
     panel.appendChild(heading);
     panel.appendChild(info);
+    panel.appendChild(state);
     panel.appendChild(debugList);
     document.body.appendChild(panel);
   }
 
-  function goatcounterReady() {
-    return window.goatcounter && typeof window.goatcounter.count === 'function';
-  }
-
-  function flushCounts() {
-    if (!goatcounterReady()) return;
-    while (pendingCounts.length) {
-      try { window.goatcounter.count(pendingCounts.shift()); } catch (e) { /* never break the page */ }
-    }
-  }
-
-  var gcScript = document.getElementById('goatcounter-script');
-  if (gcScript) gcScript.addEventListener('load', flushCounts);
+  // One pageview per page load: path only, never the query string.
+  sendHit({ p: window.location.pathname || '/', t: document.title.slice(0, 100) });
 
   function track(name) {
+    if (EVENTS.indexOf(name) === -1) return; // only approved event names
     var path = name + '/' + variantKey;
     events.push({ name: name, variant: variantKey, path: path, ms: Date.now() - pageLoadedAt });
-    pendingCounts.push({ path: path, title: name, event: true });
-    flushCounts();
+    sendHit({ p: path, t: name, e: 'true' });
     if (debugList) {
       var li = document.createElement('li');
       li.textContent = path;
@@ -141,7 +155,7 @@
 
   // Landing page view: the first step of the funnel, recorded through the
   // same track() as every other event so the whole funnel has one source.
-  // (GoatCounter's automatic pageview still runs, but has no variant.)
+  // (The plain pageview above counts every page, without the variant.)
   if (heroTitle) track('page_view');
 
   // Clicks on anything marked data-track="<event>".
