@@ -11,10 +11,11 @@ A mobile-first, conversion-focused landing page for Czech retail investors arriv
 ### Current status
 
 - **The form runs in demo mode.** Nothing is sent or stored, and no real leads are collected.
-  - **With JavaScript:** a valid submission only shows the download link. The entered data stays in the page's memory (`window.__lastLeadPayload`) until the tab closes.
+  - **With JavaScript:** a valid submission only shows the download link. The e-mail is not kept and the field is cleared. Only non-personal fields (attribution, variant, timing) remain in the page's memory (`window.__lastLeadPayload`) for local inspection, until the tab closes.
   - **Without JavaScript:** all form controls are disabled, so nothing can be typed or submitted.
 
-  Real collection stays off until the privacy details are confirmed (see [Going live](#going-live)).
+  Real collection stays off until a full privacy notice exists (see [Going live](#going-live)).
+- **Privacy page.** `ochrana-udaju.html` (Czech) describes only this demo's behaviour, and each statement is checked by a test: no e-mail sent or kept; no cookies or `localStorage` set by the site's code; `sessionStorage` used only for attribution; no analytics or third-party scripts. It says explicitly that it does not cover any technical logs of a future hosting provider. It is **not** a privacy notice for real data collection.
 - **The PDF is not gated.** `assets/tahak-etf.pdf` is a public static file. It can be opened directly by its URL, it is linked from `dekujeme.html`, and its link is already in the landing page's HTML (shown after the demo submission). The form does not control access to it.
 - **No analytics provider is connected.** The GoatCounter tag is commented out. Events stay in the browser (`window.__events`, and the `?debug=1` panel). The only browser storage used is `sessionStorage` for UTM attribution; no cookies and no third-party scripts are loaded.
 
@@ -232,7 +233,7 @@ For local testing, use the same query strings on `http://localhost:8000/`.
 ```
 index.html            landing page (form in demo mode)
 dekujeme.html         thank-you page (no-JS fallback for the live form)
-ochrana-udaju.html    DRAFT privacy notice with [DOPLNIT] placeholders
+ochrana-udaju.html    privacy page describing the demo's verified behaviour (Czech)
 tahak.html            source of the PDF cheat sheet (print layout)
 404.html
 assets/app.js         attribution, headline variant, analytics, form
@@ -251,7 +252,7 @@ ai-log/               Claude Code session exports (/export)
 
 ```sh
 python3 -m http.server 8000            # then open http://localhost:8000/?utm_content=ad_a_problem&debug=1
-node tests/e2e.mjs                     # 71 browser tests (CHROME=/path/to/chrome to override)
+node tests/e2e.mjs                     # 74 browser tests (CHROME=/path/to/chrome to override)
 ```
 
 To regenerate the PDF after editing `tahak.html`:
@@ -268,6 +269,10 @@ To regenerate the PDF after editing `tahak.html`:
   - **With JavaScript:** the controls are enabled and no request carries the e-mail.
   - **Events:** `demo_lead_success` in demo; `lead_success` only after a live 2xx, and neither after a server error.
   - **PDF:** reachable directly, without the form.
+- **Privacy claims:**
+  - the privacy page has no draft markers;
+  - in the browser, after a demo submission and visits to every page: no cookies, an empty `localStorage`, only the attribution key in `sessionStorage` (no e-mail, no consent), and no requests to other hosts;
+  - in the code: no storage or cookie APIs and no third-party script tags in any site file.
 - **UTM:** both variants, persistence across navigation, first-touch rule, length cap. Short values like `a`/`b` fall back to the default headline.
 - **Analytics:**
   - full funnel order starting with `page_view`, with variant tags;
@@ -306,13 +311,13 @@ The owner creates the accounts; nothing has been deployed yet.
 
 1. Push this repository to GitHub.
 2. Netlify → *Add new site → Import an existing project*. There is no build command; the publish directory is `.` (both are already set in `netlify.toml`).
-3. The site works immediately in **demo mode**. No form is registered and no personal data is collected.
+3. The site works immediately in **demo mode**. No form is registered, and the site's own code collects no personal data. What the hosting provider logs is outside this repository and is not verified here.
 
 ### Going live
 
-Do this only after the privacy details are confirmed.
+These are **future** steps. None of them is done; the current behaviour is described in [Current status](#current-status). Do this only after a full privacy notice is ready.
 
-1. Complete `ochrana-udaju.html`: fill every `[DOPLNIT]` (controller, purposes and legal bases, retention, processors, rights), have it reviewed, and remove the "KONCEPT" banner.
+1. Replace `ochrana-udaju.html` with a full privacy notice: controller and contact, purposes and legal bases, retention, processors (e.g. Netlify) and any transfers outside the EU, data-subject rights. Have it reviewed. The current text describes only the demo and becomes inaccurate once data is collected.
 2. In `index.html`, on `<form id="lead-form">`: add `data-netlify="true"` and change `data-lead-mode="demo"` to `"live"`. The demo notices then hide automatically, and `lead_success` starts firing for accepted submissions.
 3. Decide on visitors without JavaScript. The controls are wrapped in `<fieldset id="lead-fields" disabled>`, so without JavaScript nothing can be submitted. To accept native (no-JS) submissions in live mode, remove the `disabled` attribute. Netlify would then receive the POST and show `dekujeme.html`.
 4. Netlify → *Forms*: enable form detection and redeploy. Check that the form `lead` appears. Optionally add an e-mail notification.
@@ -326,7 +331,7 @@ Do this only after the privacy details are confirmed.
 ## What was tested, and what was not
 
 Tested locally:
-- 71/71 e2e tests pass.
+- 74/74 e2e tests pass.
 - W3C HTML validator: 0 errors on all pages except one intentional message, Netlify's non-standard `netlify-honeypot` attribute.
 - W3C CSS validator: no errors.
 - All 14 source links return HTTP 200.

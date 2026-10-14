@@ -35,8 +35,8 @@ Visitor-facing text is in Czech; code and technical documentation are in English
   - **Without JavaScript:** the form controls are disabled, so nothing can be submitted.
   - **The PDF is publicly accessible.** It is a static file at `assets/tahak-etf.pdf`, reachable by its URL and linked from `dekujeme.html`. The form does not control access to it.
   - Demo submissions are recorded as the browser-side event `demo_lead_success`, never as `lead_success`.
-  - The privacy notice is a draft with placeholders.
-  - Real lead collection is enabled only after the privacy details are confirmed.
+  - The privacy page describes only this demo's verified behaviour; it is not a notice for real data collection.
+  - Real lead collection is enabled only after a full privacy notice is ready.
 
 ## Funnel tracking
 

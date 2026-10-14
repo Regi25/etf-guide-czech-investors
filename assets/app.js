@@ -217,8 +217,14 @@
 
   function send(body) {
     if (mode === 'demo') {
-      // Nothing leaves the browser. Keep the payload for local inspection.
-      window.__lastLeadPayload = Object.fromEntries(body);
+      // Nothing leaves the browser. Keep only the non-personal fields
+      // (attribution, variant, timing) for local inspection; the e-mail is
+      // not kept anywhere.
+      var kept = Object.fromEntries(body);
+      delete kept.email;
+      delete kept.marketing_consent;
+      delete kept.company;
+      window.__lastLeadPayload = kept;
       return Promise.resolve();
     }
     // Netlify Forms AJAX submission.
@@ -267,6 +273,8 @@
         // lead_success is reserved for a live submission the server accepted.
         // In demo mode nothing was sent, so record a clearly separate event.
         track(mode === 'live' ? 'lead_success' : 'demo_lead_success');
+        // Demo: clear the typed e-mail so it does not stay in the page.
+        if (mode === 'demo') email.value = '';
         showSuccess();
       })
       .catch(function () {

@@ -91,6 +91,9 @@ async function openPage(path, { width = 390, height = 844, mobile = true, js = t
   const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true });
   await cdp('Page.enable', {}, sessionId);
   await cdp('Runtime.enable', {}, sessionId);
+  await cdp('Network.enable', {}, sessionId);
+  const urlsRequested = [];
+  listeners.push((m) => { if (m.sessionId === sessionId && m.method === 'Network.requestWillBeSent') urlsRequested.push(m.params.request.url); });
   await cdp('Log.enable', {}, sessionId);
   const errors = [];
   listeners.push((m) => {
@@ -111,6 +114,7 @@ async function openPage(path, { width = 390, height = 844, mobile = true, js = t
   const page = {
     goto, // same tab, so sessionStorage is kept
     errors,
+    urlsRequested,
     cdp: (method, params = {}) => cdp(method, params, sessionId),
 
     eval: async (expr) => {
@@ -175,7 +179,8 @@ await test('demo: valid submit without consent shows PDF link and sends nothing'
   const href = await p.eval(`document.querySelector('#lead-success a[href$=".pdf"]').getAttribute('href')`);
   assert(href === 'assets/tahak-etf.pdf', 'unexpected PDF href: ' + href);
   const payload = await p.eval('window.__lastLeadPayload');
-  assert(payload && payload.email === 'jana@example.cz', 'payload missing e-mail');
+  assert(payload && !('email' in payload), 'demo payload must not keep the e-mail');
+  assert((await p.eval(`document.getElementById('email').value`)) === '', 'demo must clear the e-mail field');
   assert(!('marketing_consent' in payload), 'unchecked consent must not be sent');
   assert(Number(payload.time_to_submit_ms) >= 0, 'time_to_submit_ms missing');
   assert(posts.length === before, 'demo mode must not POST');
@@ -698,7 +703,7 @@ await test('lead form: first-name field removed and not submitted', async () => 
   const p = await openPage('/');
   assert((await p.eval(`document.querySelectorAll('[name="first_name"], #first_name').length`)) === 0, 'first-name field still present');
   const d = await submitAndGetPayload(p);
-  assert(!('first_name' in d) && d.email === 'jana@example.cz', 'payload: ' + JSON.stringify(d));
+  assert(!('first_name' in d) && !('email' in d), 'payload: ' + JSON.stringify(d));
   await p.close();
 });
 
@@ -883,6 +888,47 @@ await test('PDF: publicly accessible without the form (direct URL, link in the p
   const thanks = await (await fetch(BASE + '/dekujeme.html')).text();
   assert(thanks.includes('href="assets/tahak-etf.pdf"'), 'dekujeme.html should link the PDF');
   assert(index.includes('<a href="dekujeme.html">'), 'the no-JS note should link dekujeme.html');
+});
+
+/* ---------- Tests: claims on the privacy page (ochrana-udaju.html) ---------- */
+
+await test('privacy page: no draft banner or placeholders; describes the demo', async () => {
+  const html = await (await fetch(BASE + '/ochrana-udaju.html')).text();
+  assert(!/DOPLNIT|KONCEPT|koncept/.test(html), 'draft markers left on the privacy page');
+  for (const m of ['ukázkovém režimu', 'Nikam se neodesílá', 'nenastavuje žádné cookies', 'sessionStorage', 'skripty třetích stran', 'Co tento popis nepokrývá'])
+    assert(html.includes(m), 'privacy page lacks: ' + m);
+  for (const f of ['/', '/dekujeme.html']) assert(!/\(koncept\)/.test(await (await fetch(BASE + f)).text()), f + ' still labels the privacy page as draft');
+});
+
+await test('privacy claims hold in the browser: no cookies, no localStorage, sessionStorage only attribution (no e-mail), no third-party requests', async () => {
+  const p = await openPage(AD_A + '&fbclid=test123');
+  await p.eval(`document.getElementById('marketing_consent').checked = true; true`);
+  await p.eval(fillAndSubmit('privacy.check@example.cz', { consent: true }));
+  await p.waitFor(isVisible('#lead-success'));
+  for (const path of ['/dekujeme.html', '/ochrana-udaju.html', '/404.html', '/tahak.html', '/']) await p.goto(path);
+  const { cookies } = await p.cdp('Network.getAllCookies');
+  assert(cookies.length === 0, 'cookies present: ' + JSON.stringify(cookies.map((c) => c.name)));
+  const st = await p.eval(`({ local: localStorage.length, keys: Object.keys(sessionStorage), dump: JSON.stringify(sessionStorage) })`);
+  assert(st.local === 0, 'localStorage used');
+  assert(st.keys.join() === 'etf_attribution_v1', 'unexpected sessionStorage keys: ' + st.keys.join());
+  assert(!st.dump.includes('privacy.check') && !st.dump.includes('marketing_consent'), 'e-mail or consent in sessionStorage');
+  const kept = await p.eval(`JSON.stringify(window.__lastLeadPayload || {})`);
+  assert(!kept.includes('privacy.check') && !kept.includes('marketing_consent'), 'demo payload kept personal fields: ' + kept);
+  const foreign = p.urlsRequested.filter((u) => !u.startsWith(BASE) && !u.startsWith('data:'));
+  assert(foreign.length === 0, 'requests to other hosts: ' + foreign.join(', '));
+  await p.close();
+});
+
+await test('privacy claims hold in the code: no localStorage, cookies or third-party script tags in site files', async () => {
+  const files = ['index.html', 'dekujeme.html', 'ochrana-udaju.html', '404.html', 'tahak.html', 'assets/app.js'];
+  for (const f of files) {
+    const src = await (await fetch(BASE + '/' + f)).text();
+    const active = src.replace(/<!--[\s\S]*?-->/g, ''); // commented-out tags are not loaded
+    // Storage APIs only matter in code: app.js and any inline <script> (page text may mention the words).
+    const code = f.endsWith('.js') ? active : [...active.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n');
+    assert(!/localStorage|document\.cookie|indexedDB/.test(code), f + ' uses persistent storage or cookies');
+    assert(!/<script[^>]+src="https?:/i.test(active), f + ' loads a third-party script');
+  }
 });
 
 /* ---------- Tests: production headers ---------- */
