@@ -1,0 +1,680 @@
+ ▐▛███▛█   Claude Code v2.1.299
+▝▜██████▀  Opus 5.5 · Claude Pro
+ ▝▝   ▝▝   ~/clientelo-etf-landing
+
+
+❯ The site is live at https://etfguide-cz.netlify.app. GoatCounter endpoint:    
+  https://etfguide-cz.goatcounter.com/count                                     
+                                                                                
+  1. Put the endpoint into the goatcounter-endpoint meta tag in both pages to   
+  activate analytics. Keep using our own privacy-first pixel; do not add        
+  GoatCounter's count.js script.                                                
+  2. Update the privacy page: analytics is now active. Remove "měření vypnuté"  
+  and describe the real data flow accurately, based on the GoatCounter docs you 
+  already checked.                                                              
+  3. GoatCounter dashboard settings: data retention 90 days; collected:         
+  aggregate pageviews and events only; sessions, referrer, user-agent, screen   
+  size, country, region and language collection are disabled; individual        
+  pageviews are not stored. Describe exactly this on the privacy page.          
+  4. Replace YOUR-SITE.netlify.app everywhere (README, ad URLs) with            
+  etfguide-cz.netlify.app. Update the README status: deployed, analytics        
+  active, form still a demo.                                                    
+  5. Run all tests and commit. Do not push: I will push from VS Code.           
+  6. Give me a short checklist to verify on the live site that events reach the 
+  GoatCounter dashboard.                                                        
+     Reply in English.                                                          
+  ⎿  ⧉ Selected 3 lines from ../../../git-error-1791997765857 in Visual Studio 
+     Code
+
+  Ran 5 shell commands (ctrl+o to expand)
+
+⏺ Bash(python3 - <<'EOF'
+      import re…)
+  ⎿   dekujeme.html | 10 +++++-----
+      index.html    | 10 +++++-----
+      2 files changed, 10 insertions(+), 10 deletions(-)
+  ⎿  Updated dekujeme.html (+5 -5)
+      10    <link rel="stylesheet" href="assets/styles.css">
+      11    <script src="assets/app.js" defer></script>
+      12    <!--
+      13 -    Analytics (GoatCounter pixel, no cookies, no device storage
+         -). INACTIVE while                                              
+      14 -    content is empty. To enable, set content to your real endpo
+         -int, e.g.                                                      
+      15 -    https://<your-code>.goatcounter.com/count (see README "Anal
+         -ytics").                                                       
+      16 -    Nothing is sent from local addresses or with any other valu
+         -e.                                                             
+      13 +    Analytics (GoatCounter pixel, no cookies, no device storage
+         +). ACTIVE: the                                                 
+      14 +    endpoint of the live site. Our own app.js sends the pixel; 
+         +GoatCounter's                                                  
+      15 +    count.js is not used. Empty content switches analytics off 
+         +(see README                                                    
+      16 +    "Funnel analytics"). Nothing is sent from local addresses. 
+      17    -->
+      18 -  <meta name="goatcounter-endpoint" content="">                
+      18 +  <meta name="goatcounter-endpoint" content="https://etfguide-c
+         +z.goatcounter.com/count">                                      
+      19  </head>
+      20  <body>
+      21    <header class="site-header">
+  ⎿  Updated index.html (+5 -5)
+      12    <link rel="stylesheet" href="assets/styles.css">
+      13    <script src="assets/app.js" defer></script>
+      14    <!--
+      15 -    Analytics (GoatCounter pixel, no cookies, no device storage
+         -). INACTIVE while                                              
+      16 -    content is empty. To enable, set content to your real endpo
+         -int, e.g.                                                      
+      17 -    https://<your-code>.goatcounter.com/count (see README "Anal
+         -ytics").                                                       
+      18 -    Nothing is sent from local addresses or with any other valu
+         -e.                                                             
+      15 +    Analytics (GoatCounter pixel, no cookies, no device storage
+         +). ACTIVE: the                                                 
+      16 +    endpoint of the live site. Our own app.js sends the pixel; 
+         +GoatCounter's                                                  
+      17 +    count.js is not used. Empty content switches analytics off 
+         +(see README                                                    
+      18 +    "Funnel analytics"). Nothing is sent from local addresses. 
+      19    -->
+      20 -  <meta name="goatcounter-endpoint" content="">                
+      20 +  <meta name="goatcounter-endpoint" content="https://etfguide-c
+         +z.goatcounter.com/count">                                      
+      21  </head>
+      22  <body>
+      23    <a class="skip-link" href="#obsah">Přeskočit na obsah</a>
+
+⏺ Endpoint is in both pages; now rewriting the privacy section.
+
+⏺ Bash(python3 - <<'EOF'
+      import re…)
+  ⎿  56:        <p>Popis se týká chování této stránky ve verzi ze dne 16.&n
+     bsp;10.&nbsp;2026. Je to technický popis, ne právní posouzení. Pokud b
+     y se stránka v&nbsp;budoucnu měla používat ke sběru e-mailů, bude tent
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated ochrana-udaju.html (+11 -3)
+      35          <p>Parametry odkazu, ze kterého jste přišli (parametry 
+          UTM a&nbsp;případné identifikátory kliknutí gclid a&nbsp;fbclid
+          ), stránka čte jen z&nbsp;adresy při načtení a&nbsp;drží je v&n
+          bsp;paměti otevřené stránky. Používá je k&nbsp;výběru nadpisu p
+          odle reklamy a&nbsp;ve formuláři, odkud se v&nbsp;ukázkovém rež
+          imu nikam neodesílají. Po opuštění stránky zmizí.</p>
+      36  
+      37          <h2>Měření návštěvnosti (GoatCounter)</h2>
+      38 -        <p><strong>V&nbsp;této verzi stránky je měření vypnuté.
+         -</strong> Události, jako je kliknutí na tlačítko, se zaznamenáv
+         -ají jen v&nbsp;paměti otevřené stránky a&nbsp;nikam se neodesíl
+         -ají. Stránka nenačítá žádné skripty třetích stran.</p>         
+      39 -        <p>Pokud provozovatel měření zapne, bude stránka posíla
+         -t službě GoatCounter (provozovanou z&nbsp;Irska) jen tyto údaje
+         -: adresu stránky bez parametrů, názvy událostí z&nbsp;pevného s
+         -eznamu (například kliknutí na tlačítko nebo zobrazení srovnání)
+         - a&nbsp;variantu stránky (a, b nebo výchozí). Neposílá e-mail, 
+         -obsah formuláře, parametry UTM ani odkazující stránku. Podle do
+         -kumentace GoatCounter tato služba neukládá IP adresy ani úplný 
+         -údaj o&nbsp;prohlížeči, nepoužívá cookies ani jiné ukládání ve 
+         -vašem zařízení a&nbsp;ukládá souhrnné počty. IP adresu a&nbsp;ú
+         -daj o&nbsp;prohlížeči používá k&nbsp;odvození země a&nbsp;typu 
+         -prohlížeče a&nbsp;k&nbsp;rozpoznání opakované návštěvy, a&nbsp;
+         -to jen v&nbsp;paměti po dobu nejvýše osmi hodin. Při zapnutí mě
+         -ření bude tento odstavec upraven.</p>                          
+      38 +        <p><strong>Měření je zapnuté.</strong> Stránka k&nbsp;n
+         +ěmu používá službu GoatCounter (provozovanou z&nbsp;Irska). Nen
+         +ačítá žádné skripty třetích stran: vlastní skript stránky pošle
+         + na adresu etfguide-cz.goatcounter.com krátký požadavek na obrá
+         +zek (takzvaný pixel). Měření nepoužívá cookies ani jiné ukládán
+         +í ve vašem zařízení.</p>                                       
+      39 +        <p>Požadavek obsahuje jen tyto údaje:</p>              
+      40 +        <ul>                                                   
+      41 +          <li>při načtení stránky její adresu bez parametrů (na
+         +příklad „/“ nebo „/dekujeme.html“) a&nbsp;její pevný název,</li
+         +>                                                              
+      42 +          <li>při události její název z&nbsp;pevného seznamu (n
+         +apříklad kliknutí na tlačítko nebo zobrazení srovnání) a&nbsp;v
+         +ariantu stránky (a, b nebo výchozí),</li>                      
+      43 +          <li>náhodný řetězec, aby prohlížeč požadavek nebral z
+         +&nbsp;mezipaměti.</li>                                         
+      44 +        </ul>                                                  
+      45 +        <p>Neposílá e-mail, obsah formuláře, parametry UTM ani 
+         +odkazující stránku.</p>                                        
+      46 +        <p>Jako každý požadavek na server nese i&nbsp;vaši IP a
+         +dresu a&nbsp;technické údaje prohlížeče (identifikaci prohlížeč
+         +e a&nbsp;jeho jazyk). V&nbsp;nastavení GoatCounter je vypnuté s
+         +ledování návštěv (relací), ukládání odkazující stránky, údajů o
+         +&nbsp;prohlížeči a&nbsp;systému, velikosti obrazovky, země, reg
+         +ionu a&nbsp;jazyka. Tyto údaje proto GoatCounter do statistik n
+         +eukládá. Podle dokumentace GoatCounter tato služba IP adresy ne
+         +ukládá.</p>                                                    
+      47 +        <p>Ukládají se jen souhrnné počty zobrazení stránek a&n
+         +bsp;událostí (například kolikrát za den někdo klikl na tlačítko
+         + ve variantě a). Jednotlivá zobrazení stránek se neukládají, ta
+         +kže z&nbsp;dat nelze zjistit, co dělal konkrétní návštěvník. Do
+         +ba uchování dat je v&nbsp;nastavení GoatCounter nastavena na 90
+         + dní.</p>                                                      
+      48  
+      49          <h2>Hosting</h2>
+      50          <p>Jako u&nbsp;každé webové stránky může poskytovatel h
+          ostingu při načtení stránky technicky zpracovávat údaje, jako j
+          e IP adresa, čas a&nbsp;typ prohlížeče, například v&nbsp;záznam
+          ech serveru. Tato stránka je nevyhodnocuje. Podrobnosti uvádí p
+          oskytovatel hostingu ve svých podmínkách.</p>
+     ...
+      53          <p>Odkazy na zdroje (správci fondů, EUR-Lex, MSCI a&nbs
+          p;další) vedou na weby třetích stran. Po kliknutí platí jejich 
+          pravidla ochrany osobních údajů.</p>
+      54  
+      55          <h2>Rozsah tohoto popisu</h2>
+      48 -        <p>Popis se týká chování této stránky ve verzi ze dne 1
+         -4.&nbsp;10.&nbsp;2026. Je to technický popis, ne právní posouze
+         -ní. Pokud by se stránka v&nbsp;budoucnu měla používat ke sběru 
+         -e-mailů, bude tento text před spuštěním nahrazen úplnými inform
+         -acemi o&nbsp;zpracování osobních údajů.</p>                    
+      56 +        <p>Popis se týká chování této stránky ve verzi ze dne 1
+         +6.&nbsp;10.&nbsp;2026. Je to technický popis, ne právní posouze
+         +ní. Pokud by se stránka v&nbsp;budoucnu měla používat ke sběru 
+         +e-mailů, bude tento text před spuštěním nahrazen úplnými inform
+         +acemi o&nbsp;zpracování osobních údajů.</p>                    
+      57  
+      58          <p><a href="./">Zpět na hlavní stránku</a></p>
+      59        </div>
+
+⏺ Now the tests: the test server's __gc switch must override the real endpoint,
+  and the privacy markers change.
+
+⏺ Bash(python3 - <<'EOF'
+      f='tests/e2e.mjs'; s=open(f).read()…)
+  ⎿  1011:const checkHits = (hits, banned) => {
+     1013:    assert(h.host === 'demo-test.goatcounter.com' && h.path === '
+     /count', 'unexpected target: ' + h.url);
+     … +31 lines (ctrl+o to expand)
+  ⎿  Updated tests/e2e.mjs (+34 -7)
+      43      if (path.endsWith('.html') && url.searchParams.has('__live'
+          )) {
+      44        data = Buffer.from(data.toString().replace('data-lead-mod
+          e="demo"', 'data-lead-mode="live" data-netlify="true"'));
+      45      }
+      46 -    // Test-only switch: ?__gc=<value> fills the GoatCounter en
+         -dpoint meta (empty in the real files).                         
+      46 +    // Test-only switch: ?__gc=<value> replaces the GoatCounter
+         + endpoint meta (the live endpoint in the real files; empty = of
+         +f).                                                            
+      47      if (path.endsWith('.html') && url.searchParams.has('__gc'))
+           {
+      48        const value = url.searchParams.get('__gc').replace(/[&"<>
+          ]/g, (c) => `&#${c.charCodeAt(0)};`);
+      49 -      data = Buffer.from(data.toString().replace('<meta name="g
+         -oatcounter-endpoint" content="">', `<meta name="goatcounter-end
+         -point" content="${value}">`));                                 
+      49 +      data = Buffer.from(data.toString().replace(/<meta name="g
+         +oatcounter-endpoint" content="[^"]*">/, `<meta name="goatcounte
+         +r-endpoint" content="${value}">`));                            
+      50      }
+      51      res.writeHead(200, { 'Content-Type': TYPES[extname(path)] |
+          | 'application/octet-stream', 'Content-Security-Policy': CSP })
+          .end(data);
+      52    } catch {
+     ...
+      921  
+      922  /* ---------- Tests: claims on the privacy page (ochrana-udaju
+           .html) ---------- */
+      923  
+      924 -await test('privacy page: no draft banner or placeholders; des
+          -cribes the demo', async () => {                               
+      924 +await test('privacy page: no draft banner or placeholders; des
+          +cribes the demo and the active measurement', async () => {    
+      925    const html = await (await fetch(BASE + '/ochrana-udaju.html'
+           )).text();
+      926    assert(!/DOPLNIT|KONCEPT|koncept/.test(html), 'draft markers
+            left on the privacy page');
+      927    for (const m of ['ukázkovém režimu', 'Nikam se neodesílá', '
+           Co stránka ukládá ve vašem zařízení', 'nepoužívá cookies, loca
+           lStorage, sessionStorage ani IndexedDB',
+      928 -    'skripty třetích stran', 'měření vypnuté', 'Neposílá e-mai
+          -l, obsah formuláře, parametry UTM ani odkazující stránku', 'Ho
+          -sting', 'ne právní posouzení'])                               
+      928 +    'skripty třetích stran', 'Měření je zapnuté', 'Neposílá e-
+          +mail, obsah formuláře, parametry UTM ani odkazující stránku', 
+          +'etfguide-cz.goatcounter.com',                                
+      929 +    'vypnuté sledování návštěv (relací), ukládání odkazující s
+          +tránky, údajů o&nbsp;prohlížeči a&nbsp;systému, velikosti obra
+          +zovky, země, regionu a&nbsp;jazyka',                          
+      930 +    'Jednotlivá zobrazení stránek se neukládají', 'nastavena n
+          +a 90 dní', 'Hosting', 'ne právní posouzení'])                 
+      931      assert(html.includes(m), 'privacy page lacks: ' + m);
+      932 +  assert(!/měření vypnuté|Při zapnutí měření/.test(html), 'pri
+          +vacy page still says measurement is off');                    
+      933    for (const f of ['/', '/dekujeme.html']) assert(!/\(koncept\
+           )/.test(await (await fetch(BASE + f)).text()), f + ' still lab
+           els the privacy page as draft');
+      934  });
+      935  
+     ...
+      1003    await p.close();
+      1004  });
+      1005  
+      1003 -/* ---------- Tests: GoatCounter pixel (inactive by default; 
+           -privacy of what is sent) ---------- */                       
+      1006 +/* ---------- Tests: GoatCounter pixel (live endpoint configu
+           +red; privacy of what is sent) ---------- */                  
+      1007  
+      1008  const APPROVED = ['page_view', 'cta_click', 'compare_click', 
+            'compare_cta_click', 'comparison_view', 'form_start', 'form_s
+            ubmit',
+      1009    'demo_lead_success', 'lead_success', 'form_error', 'magnet_
+            download', 'source_click'];
+     ...
+      1028  };
+      1029  
+      1030  await test('analytics inactive: no request without a real end
+            point (empty, placeholders, wrong host or scheme), even on a 
+            public host', async () => {
+     … 38 more lines (ctrl+o to expand)
+
+  Searched for 1 pattern, ran 2 shell commands (ctrl+o to expand)
+
+⏺ This test ran on 127.0.0.1, so with the endpoint now set, the expected state
+  is inactive (local address). Updating it to match:
+
+⏺ Bash(sed -i '' "482s/analytics: inactive (no endpoint configured)/analytics:
+      inactive (local address)/" tests/e2e.mjs && sed -n 482p tests/e2e.mjs &&
+      node tests/e2e.…)
+  ⎿    assert((await p.eval(`document.querySelector('.debug-panel').textCon
+     tent`)).includes('analytics: inactive (local address)'), 'analytics st
+     ate missing');
+     … +2 lines (ctrl+o to expand)
+  ⎿  Updated tests/e2e.mjs (+1 -1)
+      479    assert((await p.eval(`[...document.querySelectorAll('.debug-
+           panel li')].map(li => li.textContent).join()`)) === 'page_view
+           /default', 'panel rows');
+      480    const info = await p.eval(`document.querySelector('.debug-pa
+           nel p').textContent`);
+      481    assert(info.includes('variant: default') && info.includes('n
+           ot recognised') && info.includes('ad_a_problem'), 'info: ' + i
+           nfo);
+      482 -  assert((await p.eval(`document.querySelector('.debug-panel')
+          -.textContent`)).includes('analytics: inactive (no endpoint con
+          -figured)'), 'analytics state missing');                       
+      482 +  assert((await p.eval(`document.querySelector('.debug-panel')
+          +.textContent`)).includes('analytics: inactive (local address)'
+          +), 'analytics state missing');                                
+      483    await p.goto('/?utm_content=ad_a_problem&debug=1'); // same 
+           tab: only the current URL counts
+      484    const now = await p.eval(`document.querySelector('.debug-pan
+           el p').textContent`);
+      485    assert(now.includes('variant: a (utm_content=ad_a_problem)')
+           , 'current link should be shown: ' + now);
+  ⎿  (timeout 10m)
+
+⏺ Tests pass. Now the README.
+
+⏺ Bash(python3 - <<'EOF'
+      f='README.md'; s=open(f).read()…)
+  ⎿  224:- shows the analytics state: `active (<code>.goatcounter.com)`, `i
+     nactive (no endpoint configured)` or `inactive (local address)`;
+     231:GoatCounter stores **counts per path per period**, not visitor rec
+     … +9 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+22 -17)
+       6  
+       7  - Customer-facing copy is in Czech. Code and docs are in Englis
+          h.
+       8  - Static HTML/CSS/vanilla JS with no build step and no dependen
+          cies.
+       9 -- **Status: demo, not deployed.** See [Current status](#current
+         --status).                                                      
+       9 +- **Status: deployed at https://etfguide-cz.netlify.app; analyt
+         +ics active; the form is still a demo.** See [Current status](#c
+         +urrent-status).                                                
+      10  
+      11  ### Current status
+      12  
+      13 +- **Deployed** on Netlify at https://etfguide-cz.netlify.app.  
+      14  - **The form runs in demo mode.** Nothing is sent or stored, an
+          d no real leads are collected.
+      15    - **With JavaScript:** a valid submission only shows the down
+          load link. The e-mail is not kept and the field is cleared. Onl
+          y non-personal fields (attribution, variant, timing) remain in 
+          the page's memory (`window.__lastLeadPayload`) for local inspec
+          tion, until the tab closes.
+      16    - **Without JavaScript:** all form controls are disabled, so 
+          nothing can be typed or submitted.
+      17  
+      18    Real collection stays off until a full privacy notice exists 
+          (see [Going live](#going-live)).
+      18 -- **Privacy page.** `ochrana-udaju.html` (Czech) describes only
+         - this demo's behaviour, and each statement is checked by a test
+         -: no e-mail sent or kept; nothing stored on the visitor's devic
+         -e (no cookies, `localStorage`, `sessionStorage` or IndexedDB); 
+         -measurement switched off, with what GoatCounter would receive o
+         -nce it is switched on; no third-party scripts. Hosting-provider
+         - logs are mentioned only in general terms, because they are out
+         -side this repository. It states that it is a technical descript
+         -ion, not a legal assessment, and it is **not** a privacy notice
+         - for real data collection.                                     
+      19 +- **Privacy page.** `ochrana-udaju.html` (Czech) describes only
+         + this demo's behaviour, and each statement is checked by a test
+         +: no e-mail sent or kept; nothing stored on the visitor's devic
+         +e (no cookies, `localStorage`, `sessionStorage` or IndexedDB); 
+         +measurement switched on, with exactly what GoatCounter receives
+         + and the dashboard settings (what is and is not collected, 90-d
+         +ay retention); no third-party scripts. Hosting-provider logs ar
+         +e mentioned only in general terms, because they are outside thi
+         +s repository. It states that it is a technical description, not
+         + a legal assessment, and it is **not** a privacy notice for rea
+         +l data collection.                                             
+      20  - **The PDF is not gated.** `assets/tahak-etf.pdf` is a public 
+          static file. It can be opened directly by its URL, it is linked
+           from `dekujeme.html`, and its link is already in the landing p
+          age's HTML (shown after the demo submission). The form does not
+           control access to it.
+      20 -- **Analytics is inactive.** The GoatCounter endpoint (`<meta n
+         -ame="goatcounter-endpoint" content="">`) is empty, so no reques
+         -t is made. Events stay in the page (`window.__events`, and the 
+         -`?debug=1` panel). See [Funnel analytics](#funnel-analytics).  
+      21 +- **Analytics is active.** Both pages carry the GoatCounter end
+         +point `https://etfguide-cz.goatcounter.com/count`. The site's o
+         +wn script sends GoatCounter's privacy-first pixel; GoatCounter'
+         +s `count.js` is not loaded. Locally (`localhost`, `127.*`) noth
+         +ing is sent. See [Funnel analytics](#funnel-analytics).        
+      22  - **Nothing is stored on the visitor's device.** UTM attributio
+          n is read from the current URL on each page load and kept in me
+          mory only. No cookies, `localStorage`, `sessionStorage` or Inde
+          xedDB, and no third-party scripts.
+      23  
+      24  ### Quick start (local, nothing to install except Python 3)
+     ...
+      175  
+      176  ## Funnel analytics
+      177  
+      177 -**Status: inactive.** `assets/app.js` contains a GoatCounter i
+          -ntegration that stays off until a real endpoint is configured.
+          - Until then, events are only recorded in the page (`window.__e
+          -vents`, `?debug=1`). No request is made, and no third-party sc
+          -ript exists in the code.                                      
+      178 +**Status: active** on https://etfguide-cz.netlify.app, endpoin
+          +t `https://etfguide-cz.goatcounter.com/count`. Events are also
+          + recorded in the page (`window.__events`, `?debug=1`). No thir
+          +d-party script exists in the code.                            
+      179  
+      179 -### How it works when switched on                             
+      180 +### How it works                                              
+      181  
+      182  The page uses GoatCounter's documented **tracking pixel** (`/c
+           ount?p=…`) from its own script. It does not use GoatCounter's 
+           `count.js`, which by default sends the full path including the
+            query string and relies on the `Referer` header. `app.js` sen
+           ds a hit only when **both** conditions hold:
+      183  - `<meta name="goatcounter-endpoint">` in `index.html` / `deku
+           jeme.html` matches `https://<code>.goatcounter.com/count` exac
+           tly, and `<code>` is not a placeholder (`your-code`, `example`
+           , …);
+     ...
+      228  
+      229  ### What the aggregate counts can and cannot show
+      230  
+      230 -GoatCounter stores **counts per path per period**, not visitor
+          - records. Its "visitors" figure de-duplicates repeat hits from
+          - the same browser within about 8 hours (matched in memory on G
+          -oatCounter's side, not on the device).                        
+      231 +GoatCounter stores **counts per path per period**, not visitor
+          + records. Session tracking is switched off in the dashboard, s
+          +o there is no reliable unique-visitor figure: read the counts 
+          +as hits, not people.                                          
+      232  
+      233  They **can** show:
+     … 58 more lines (ctrl+o to expand)
+
+⏺ Bash(sed -i '' '371s/measurement (switched on, the GoatCounter settings and
+      90-day retention; no longer "switched off"), hosting and
+      scope;/measurement (switched on,…)
+  ⎿    - the privacy page has no draft markers and contains the statements
+     on device storage, measurement (switched on, the GoatCounter settings
+     and the 90-day retention), hosting and scope; it no longer says measur
+     … +9 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+1 -1)
+      368    - **PDF:** reachable directly, without the form.
+      369  - **CTAs:** the CTA after the comparison sits after the cards,
+            the US table and the footnotes and before the form; it has th
+           e primary style, is full width and at least 44 px tall on phon
+           es, is tracked as `compare_cta_click` and lands on the form. T
+           he hero CTA leads to the form and does not promise a direct do
+           wnload.
+      370  - **Privacy claims:**
+      371 -  - the privacy page has no draft markers and contains the sta
+          -tements on device storage, measurement (switched on, the GoatC
+          -ounter settings and 90-day retention; no longer "switched off"
+          -), hosting and scope;                                         
+      371 +  - the privacy page has no draft markers and contains the sta
+          +tements on device storage, measurement (switched on, the GoatC
+          +ounter settings and the 90-day retention), hosting and scope; 
+          +it no longer says measurement is off;                         
+      372    - in the browser, after a demo submission and visits to ever
+           y page: no cookies, and empty `localStorage`, `sessionStorage`
+            and IndexedDB; no requests to other hosts;
+      373    - in the code: no cookie or storage APIs (`localStorage`, `s
+           essionStorage`, IndexedDB, Cache Storage) and no third-party s
+           cript tags in any site file.
+      374  - **UTM:** both variants; attribution comes only from the curr
+           ent URL and does not carry over to the next load; length cap. 
+           Short values like `a`/`b` fall back to the default headline.
+  ⎿  PostToolUse:Bash says: Tip: Run /ultrareview before you push to catch bugs 
+     with a cloud-based multi-agent review — 3 free reviews left.
+
+⏺ I've turned analytics on, rewritten the privacy section, updated the README
+  and committed as 5d65579. I haven't pushed, and the working tree is clean. All
+  84 tests pass.
+
+  What changed
+  1. Endpoint: index.html and dekujeme.html now point to
+     https://etfguide-cz.goatcounter.com/count. Our own pixel in app.js sends
+     the data and GoatCounter's count.js isn't loaded. A new test fails if
+     count.js or gc.zgo.at ever shows up. Nothing is sent from localhost or
+     127.*.
+  2. Privacy page (ochrana-udaju.html): "měření vypnuté" is gone. The section
+     now covers:
+     - What the pixel sends: the page path without its query string, the fixed
+       page title, the event name, the variant (a/b/výchozí) and a random
+       cache-buster.
+     - What it doesn't send: e-mail, form values, UTM parameters or the
+       referrer.
+     - IP and browser details: every request carries the IP address and browser
+       details, but those collection settings are off. Per GoatCounter's docs,
+       it doesn't store IP addresses.
+     - Your dashboard settings, exactly as you listed them: aggregate pageviews
+       and events only; sessions, referrer, user-agent, screen size, country,
+       region and language off; no individual pageviews stored; 90-day
+       retention.
+     - The version date is now 16. 10. 2026.
+  3. README: the status now reads "deployed, analytics active, form still a
+     demo". YOUR-SITE.netlify.app is replaced everywhere, including the ad URLs.
+     "Switching it on" is now a "Configuration (owner)" section listing your
+     settings. I also took out the "8-hour visitor de-duplication" note, because
+     sessions are off.
+  4. Tests: the test-only endpoint override now replaces the real endpoint. New
+     tests check that both pages carry the live endpoint, and that the real
+     files send hits only to etfguide-cz.goatcounter.com; in tests those hits
+     are intercepted, so nothing reaches GoatCounter. One existing debug-panel
+     test now expects inactive (local address) instead of no endpoint 
+     configured.
+
+  Please check
+  - The privacy page still says GoatCounter is "provozovanou z Irska". That's
+    from the earlier text, and I didn't re-verify it this session.
+  - The README "Testing tip" still says the first ad of a browser session is
+    kept. That contradicts the in-memory attribution. It isn't new and I didn't
+    change it, but it should be fixed before submission.
+
+  Check it on the live site (after you push and Netlify finishes deploying)
+  1. Use a fresh private window with ad blockers and tracking protection off;
+     they block the pixel.
+  2. Open https://etfguide-cz.netlify.app/?utm_content=ad_a_problem&debug=1. The
+     panel should show variant: a and analytics: active 
+     (etfguide-cz.goatcounter.com).
+  3. In DevTools → Network, filter for goatcounter. You should see image
+     requests to /count with only p, t, rnd and (for events) e=true, a 200/204
+     response, and no Referer header.
+  4. Click the hero CTA, then "Zobrazit srovnání", then submit the demo form. In
+     the debug panel you should see page_view/a, cta_click/a, compare_click/a,
+     comparison_view/a, form_start/a, form_submit/a and demo_lead_success/a.
+  5. Repeat with ?utm_content=ad_b_compare to get /b events.
+  6. In the GoatCounter dashboard, after a minute or two, you should see the
+     paths /, page_view/a, cta_click/a and so on, with events marked as events.
+  7. Confirm that no path contains ?, utm_ or an e-mail address, and that the
+     browser, country, size and referrer panels are empty.
+  8. In the console, document.cookie should be empty, and Application → Storage
+     should show nothing.
+
+  About the push error you selected: GitHub no longer accepts passwords over
+  HTTPS. Signing in to GitHub in VS Code (Accounts menu) or running gh auth 
+  login fixes it. You can also use a personal access token as the password.
+
+✻ Baked for 4m 14s · done 9:27 AM
+
+❯ Two small fixes, then commit. Do not push.                                    
+  1. Re-check GoatCounter's current docs or site: is it operated from Ireland / 
+  the EU? If you can confirm it on an official GoatCounter page, keep the       
+  statement and note the source URL in the README. If not, remove the claim     
+  from the privacy page.                                                        
+  2. Fix the README "Testing tip" to match in-memory attribution: each page     
+  load takes the variant only from its own URL; nothing carries over between    
+  loads.                                                                        
+     Run all tests and commit.                                                  
+
+⏺ Fetch(https://www.goatcounter.com/help/gdpr)
+  ⎿  Received 13.7KB (200 OK)
+
+⏺ Fetch(https://www.goatcounter.com/privacy)
+  ⎿  Received 16.3KB (200 OK)
+
+⏺ The privacy page seems to confirm it. I'll check the raw text myself rather
+  than rely on the summary:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ GoatCounter's privacy policy confirms it's operated by Martin Tournoij in
+  Ireland, with data stored on Hetzner servers in Finland and Germany—I'll keep
+  this claim, add the storage location detail, and cite the source in the
+  README.
+
+⏺ Bash(python3 - <<'EOF'
+      f='ochrana-udaju.html'; s=open(f).read()…)
+  ⎿  327:**Testing tip:** each page load takes the variant only from its ow
+     n URL, and nothing carries over between loads. You can open the ad A a
+     nd ad B URLs one after another in the same window, and each shows its
+     … +4 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+2 -1)
+      252    - collected: aggregate pageviews and events only;
+      253    - **disabled:** sessions, referrer, user-agent (browser and 
+           OS), screen size, country, region and language;
+      254    - individual pageviews are not stored.
+      255 +- **Operator and data location** (stated on the privacy page):
+          + GoatCounter.com is operated by Martin Tournoij, located in Ir
+          +eland; data is stored on servers at Hetzner Online GmbH in Fin
+          +land and Germany. Source: GoatCounter's privacy policy, https:
+          +//www.goatcounter.com/privacy (checked 2026-10-16).           
+      256  - If any of these settings change, update `ochrana-udaju.html`
+            and the test that checks its text in the same commit.
+      257  - **Check on the live site:** open `https://etfguide-cz.netlif
+           y.app/?utm_content=ad_a_problem&debug=1`, check that the panel
+            says `active (etfguide-cz.goatcounter.com)`, click a CTA, and
+            confirm `page_view/a` and `cta_click/a` appear in the dashboa
+           rd.
+      258  
+     ...
+      324  
+      325  For local testing, use the same query strings on `http://local
+           host:8000/`.
+      326  
+      326 -**Testing tip:** the first ad of a browser session is kept. Af
+          -ter opening one test URL, a different `utm_content` in the sam
+          -e window will **not** change the headline. Use a new incognito
+          - window (or close all tabs of the site) for each test URL.    
+      327 +**Testing tip:** each page load takes the variant only from it
+          +s own URL, and nothing carries over between loads. You can ope
+          +n the ad A and ad B URLs one after another in the same window,
+          + and each shows its own headline. Reloading or revisiting with
+          +out `utm_content` shows the default headline.                 
+      328  
+      329  ## Project structure
+      330  
+  ⎿  Updated ochrana-udaju.html (+1 -1)
+      35          <p>Parametry odkazu, ze kterého jste přišli (parametry 
+          UTM a&nbsp;případné identifikátory kliknutí gclid a&nbsp;fbclid
+          ), stránka čte jen z&nbsp;adresy při načtení a&nbsp;drží je v&n
+          bsp;paměti otevřené stránky. Používá je k&nbsp;výběru nadpisu p
+          odle reklamy a&nbsp;ve formuláři, odkud se v&nbsp;ukázkovém rež
+          imu nikam neodesílají. Po opuštění stránky zmizí.</p>
+      36  
+      37          <h2>Měření návštěvnosti (GoatCounter)</h2>
+      38 -        <p><strong>Měření je zapnuté.</strong> Stránka k&nbsp;n
+         -ěmu používá službu GoatCounter (provozovanou z&nbsp;Irska). Nen
+         -ačítá žádné skripty třetích stran: vlastní skript stránky pošle
+         - na adresu etfguide-cz.goatcounter.com krátký požadavek na obrá
+         -zek (takzvaný pixel). Měření nepoužívá cookies ani jiné ukládán
+         -í ve vašem zařízení.</p>                                       
+      38 +        <p><strong>Měření je zapnuté.</strong> Stránka k&nbsp;n
+         +ěmu používá službu GoatCounter, kterou provozuje Martin Tournoi
+         +j z&nbsp;Irska. Data se podle zásad ochrany soukromí GoatCounte
+         +r ukládají na serverech společnosti Hetzner ve Finsku a&nbsp;v&
+         +nbsp;Německu. Nenačítá žádné skripty třetích stran: vlastní skr
+         +ipt stránky pošle na adresu etfguide-cz.goatcounter.com krátký 
+         +požadavek na obrázek (takzvaný pixel). Měření nepoužívá cookies
+         + ani jiné ukládání ve vašem zařízení.</p>                      
+      39          <p>Požadavek obsahuje jen tyto údaje:</p>
+      40          <ul>
+      41            <li>při načtení stránky její adresu bez parametrů (na
+          příklad „/“ nebo „/dekujeme.html“) a&nbsp;její pevný název,</li
+          >
+  ⎿  (timeout 10m)
+
+⏺ One wording fix: a reload keeps the same URL, so "reloading" is wrong there.
+
+⏺ Bash(sed -i '' '327s/Reloading or revisiting without `utm_content` shows the
+      default headline./Opening the page without `utm_content` (for example,
+      typing the bare d…)
+  ⎿  **Testing tip:** each page load takes the variant only from its own UR
+     L, and nothing carries over between loads. You can open the ad A and a
+     d B URLs one after another in the same window, and each shows its own
+     … +6 lines (ctrl+o to expand)
+  ⎿  Updated README.md (+1 -1)
+      324  
+      325  For local testing, use the same query strings on `http://local
+           host:8000/`.
+      326  
+      327 -**Testing tip:** each page load takes the variant only from it
+          -s own URL, and nothing carries over between loads. You can ope
+          -n the ad A and ad B URLs one after another in the same window,
+          - and each shows its own headline. Reloading or revisiting with
+          -out `utm_content` shows the default headline.                 
+      327 +**Testing tip:** each page load takes the variant only from it
+          +s own URL, and nothing carries over between loads. You can ope
+          +n the ad A and ad B URLs one after another in the same window,
+          + and each shows its own headline. Opening the page without `ut
+          +m_content` (for example, typing the bare domain) shows the def
+          +ault headline.                                                
+      328  
+      329  ## Project structure
+      330  
+
+⏺ I made both fixes and committed them as a230d0b. All 84 tests pass, the
+  working tree is clean, and nothing is pushed.
+
+  1. Ireland claim: confirmed, so I kept it. GoatCounter's privacy policy at
+     https://www.goatcounter.com/privacy says: "GoatCounter.com is operated by 
+     Martin Tournoij, located in Ireland." I read this in the raw page text
+     myself, not only in a summary.
+     - Privacy page: it now names the operator and also says the data is stored
+       on Hetzner servers in Finland and Germany. The same policy page says that
+       too, and it's the more relevant fact for where visitor data actually
+       lives.
+     - README: the "Configuration (owner)" section now gives that URL as the
+       source, dated 2026-10-16.
+     - Note that GoatCounter is run by one person, not a company.
+  2. Testing tip: it now says each page load takes the variant only from its own
+     URL and nothing carries over between loads. You can open the ad A and ad B
+     URLs one after another in the same window and each shows its own headline.
+     Opening the bare domain without utm_content shows the default headline.
+✻ Worked for 1m 11s · done 9:31 AM
+
+※ recap: Goal: get the live ETF landing page ready, with analytics on and accurate privacy and README docs; all changes are committed locally (a230d0b) and all 84 tests pass. Next, you push from VS Code and run the live-site analytics checklist. (disable recaps in /config)
