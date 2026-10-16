@@ -252,6 +252,7 @@ Small numbers will not separate the variants. For example, telling a 6 % lead ra
   - collected: aggregate pageviews and events only;
   - **disabled:** sessions, referrer, user-agent (browser and OS), screen size, country, region and language;
   - individual pageviews are not stored.
+- **Operator and data location** (stated on the privacy page): GoatCounter.com is operated by Martin Tournoij, located in Ireland; data is stored on servers at Hetzner Online GmbH in Finland and Germany. Source: GoatCounter's privacy policy, https://www.goatcounter.com/privacy (checked 2026-10-16).
 - If any of these settings change, update `ochrana-udaju.html` and the test that checks its text in the same commit.
 - **Check on the live site:** open `https://etfguide-cz.netlify.app/?utm_content=ad_a_problem&debug=1`, check that the panel says `active (etfguide-cz.goatcounter.com)`, click a CTA, and confirm `page_view/a` and `cta_click/a` appear in the dashboard.
 
@@ -323,7 +324,7 @@ Ad B: https://etfguide-cz.netlify.app/?utm_source=meta&utm_medium=paid_social&ut
 
 For local testing, use the same query strings on `http://localhost:8000/`.
 
-**Testing tip:** the first ad of a browser session is kept. After opening one test URL, a different `utm_content` in the same window will **not** change the headline. Use a new incognito window (or close all tabs of the site) for each test URL.
+**Testing tip:** each page load takes the variant only from its own URL, and nothing carries over between loads. You can open the ad A and ad B URLs one after another in the same window, and each shows its own headline. Opening the page without `utm_content` (for example, typing the bare domain) shows the default headline.
 
 ## Project structure
 
