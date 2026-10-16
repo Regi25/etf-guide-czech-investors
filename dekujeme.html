@@ -10,12 +10,12 @@
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/app.js" defer></script>
   <!--
-    Analytics (GoatCounter pixel, no cookies, no device storage). INACTIVE while
-    content is empty. To enable, set content to your real endpoint, e.g.
-    https://<your-code>.goatcounter.com/count (see README "Analytics").
-    Nothing is sent from local addresses or with any other value.
+    Analytics (GoatCounter pixel, no cookies, no device storage). ACTIVE: the
+    endpoint of the live site. Our own app.js sends the pixel; GoatCounter's
+    count.js is not used. Empty content switches analytics off (see README
+    "Funnel analytics"). Nothing is sent from local addresses.
   -->
-  <meta name="goatcounter-endpoint" content="">
+  <meta name="goatcounter-endpoint" content="https://etfguide-cz.goatcounter.com/count">
 </head>
 <body>
   <header class="site-header">
