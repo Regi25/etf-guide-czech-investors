@@ -43,7 +43,7 @@ const server = createServer(async (req, res) => {
     if (path.endsWith('.html') && url.searchParams.has('__live')) {
       data = Buffer.from(data.toString().replace('data-lead-mode="demo"', 'data-lead-mode="live" data-netlify="true"'));
     }
-    // Test-only switch: ?__gc=<value> replaces the GoatCounter endpoint meta (the live endpoint in the real files; empty = off).
+    // Test-only switch: ?__gc=<value> replaces the GoatCounter endpoint meta (empty in the real files: analytics is switched off).
     if (path.endsWith('.html') && url.searchParams.has('__gc')) {
       const value = url.searchParams.get('__gc').replace(/[&"<>]/g, (c) => `&#${c.charCodeAt(0)};`);
       data = Buffer.from(data.toString().replace(/<meta name="goatcounter-endpoint" content="[^"]*">/, `<meta name="goatcounter-endpoint" content="${value}">`));
@@ -479,7 +479,7 @@ await test('debug: panel shows page_view on load and explains an unrecognised ut
   assert((await p.eval(`[...document.querySelectorAll('.debug-panel li')].map(li => li.textContent).join()`)) === 'page_view/default', 'panel rows');
   const info = await p.eval(`document.querySelector('.debug-panel p').textContent`);
   assert(info.includes('variant: default') && info.includes('not recognised') && info.includes('ad_a_problem'), 'info: ' + info);
-  assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: inactive (local address)'), 'analytics state missing');
+  assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: inactive (no endpoint configured)'), 'analytics state missing');
   await p.goto('/?utm_content=ad_a_problem&debug=1'); // same tab: only the current URL counts
   const now = await p.eval(`document.querySelector('.debug-panel p').textContent`);
   assert(now.includes('variant: a (utm_content=ad_a_problem)'), 'current link should be shown: ' + now);
@@ -921,15 +921,14 @@ await test('PDF: publicly accessible without the form (direct URL, link in the p
 
 /* ---------- Tests: claims on the privacy page (ochrana-udaju.html) ---------- */
 
-await test('privacy page: no draft banner or placeholders; describes the demo and the active measurement', async () => {
+await test('privacy page: no draft banner or placeholders; describes the demo and measurement switched off', async () => {
   const html = await (await fetch(BASE + '/ochrana-udaju.html')).text();
   assert(!/DOPLNIT|KONCEPT|koncept/.test(html), 'draft markers left on the privacy page');
   for (const m of ['ukázkovém režimu', 'Nikam se neodesílá', 'Co stránka ukládá ve vašem zařízení', 'nepoužívá cookies, localStorage, sessionStorage ani IndexedDB',
-    'skripty třetích stran', 'Měření je zapnuté', 'Neposílá e-mail, obsah formuláře, parametry UTM ani odkazující stránku', 'etfguide-cz.goatcounter.com',
-    'vypnuté sledování návštěv (relací), ukládání odkazující stránky, údajů o&nbsp;prohlížeči a&nbsp;systému, velikosti obrazovky, země, regionu a&nbsp;jazyka',
-    'Jednotlivá zobrazení stránek se neukládají', 'nastavena na 90 dní', 'Hosting', 'ne právní posouzení'])
+    'skripty třetích stran', 'Měření návštěvnosti je vypnuté', 'neposílá žádné údaje o&nbsp;vaší návštěvě službě GoatCounter ani žádné jiné třetí straně',
+    'Hosting', 'ne právní posouzení'])
     assert(html.includes(m), 'privacy page lacks: ' + m);
-  assert(!/měření vypnuté|Při zapnutí měření/.test(html), 'privacy page still says measurement is off');
+  assert(!/Měření je zapnuté|etfguide-cz\.goatcounter|pixel|90 dní|Tournoij|Hetzner/.test(html), 'privacy page still describes an active GoatCounter setup');
   for (const f of ['/', '/dekujeme.html']) assert(!/\(koncept\)/.test(await (await fetch(BASE + f)).text()), f + ' still labels the privacy page as draft');
 });
 
@@ -1003,7 +1002,7 @@ await test('hero CTA: leads to the form and does not promise a direct download',
   await p.close();
 });
 
-/* ---------- Tests: GoatCounter pixel (live endpoint configured; privacy of what is sent) ---------- */
+/* ---------- Tests: GoatCounter pixel (switched off in the real files; privacy of what would be sent) ---------- */
 
 const APPROVED = ['page_view', 'cta_click', 'compare_click', 'compare_cta_click', 'comparison_view', 'form_start', 'form_submit',
   'demo_lead_success', 'lead_success', 'form_error', 'magnet_download', 'source_click'];
@@ -1099,27 +1098,32 @@ await test('analytics active: thank-you page sends its path without the query st
   await p.close();
 });
 
-const LIVE_GC = 'https://etfguide-cz.goatcounter.com/count';
-
-await test('analytics configured: both pages carry the live endpoint and no GoatCounter count.js', async () => {
+await test('analytics switched off: both pages have an empty endpoint and no GoatCounter count.js', async () => {
   for (const f of ['index.html', 'dekujeme.html']) {
     const html = await (await fetch(BASE + '/' + f)).text();
-    assert(html.includes(`<meta name="goatcounter-endpoint" content="${LIVE_GC}">`), f + ': live endpoint missing');
+    const metas = [...html.matchAll(/<meta name="goatcounter-endpoint" content="([^"]*)">/g)];
+    assert(metas.length === 1 && metas[0][1] === '', f + ': endpoint should be empty: ' + metas.map((m) => m[1]));
     assert(!/count\.js|gc\.zgo\.at|data-goatcounter/.test(html.replace(/<!--[\s\S]*?-->/g, '')), f + ': GoatCounter script tag found');
   }
 });
 
-await test('analytics active with the real files (public host, no override): hits go only to the live endpoint', async () => {
+await test('analytics switched off: no page sends an analytics request on the public domain (real files, no override)', async () => {
   const p = await openPage(AD_A + '&debug=1', { base: PUBLIC_BASE });
+  assert((await p.eval('location.hostname')) === 'etf.test', 'setup: not on the public test host');
   await p.eval(BLOCK_NAV);
-  assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: active (etfguide-cz.goatcounter.com)'), 'debug state');
+  assert((await p.eval(`document.querySelector('.debug-panel').textContent`)).includes('analytics: inactive (no endpoint configured)'), 'debug state');
   await p.eval(`document.querySelector('.hero [data-track="cta_click"]').click(); true`);
+  await p.eval(`document.querySelector('[data-track="compare_click"]').click(); true`);
+  await p.eval(fillAndSubmit('jana@example.cz'));
+  await p.waitFor(isVisible('#lead-success'));
+  await p.eval(`document.querySelector('#lead-success [data-track="magnet_download"]').click(); true`);
   await settle(300);
-  const ps = p.hits.map((h) => Object.fromEntries(h.params).p);
-  assert(JSON.stringify(ps.filter((n) => n !== 'comparison_view/a')) === JSON.stringify(['/', 'page_view/a', 'cta_click/a']), 'hits: ' + ps.join(','));
-  assert(p.hits.every((h) => h.url.startsWith(LIVE_GC + '?')), 'hits to another endpoint: ' + p.hits.map((h) => h.url).join(' '));
-  const other = p.urlsRequested.filter((u) => !u.startsWith(PUBLIC_BASE) && !u.startsWith('data:') && !u.startsWith(LIVE_GC + '?'));
-  assert(other.length === 0, 'other hosts requested: ' + other.join(' '));
+  assert((await names(p)).includes('demo_lead_success'), 'browser-side events should still be recorded: ' + (await names(p)));
+  for (const path of ['/dekujeme.html?debug=1', '/ochrana-udaju.html', '/404.html', '/tahak.html', '/?utm_content=ad_b_compare']) await p.goto(path);
+  await settle(300);
+  assert(p.hits.length === 0, 'analytics requests made: ' + p.hits.map((h) => h.url).join(' '));
+  const other = p.urlsRequested.filter((u) => !u.startsWith(PUBLIC_BASE) && !u.startsWith('data:'));
+  assert(other.length === 0, 'requests to other hosts: ' + other.join(' '));
   await p.close();
 });
 
